@@ -23,6 +23,7 @@ const estado = {
   audiosHoje: {},          // codigo_ibge -> { url, segundos }: o MP3 do aviso de hoje (comparativo)
   verUcs: true,            // camada dos pontos das UCs (só logo depois do envio; o histórico não tem pontos)
   verRede: true,           // rede elétrica FICTÍCIA (demonstração), de perto; o botão esconde
+  evidencia: null,         // comunidade clicada no mapa: { chave } (borda branca e nome em destaque); clicar de novo ou no mapa tira
   legendaMinimizada: false, // lembrada neste navegador (só conveniência)
   redes: {},               // codigo_ibge -> rede fictícia do município (null: sem rede no banco)
   formulario: null,        // { data: '20/11', dataLonga: '20/11/2026', horario: '8h às 14h', idioma: 'pt-BR' }
@@ -461,9 +462,10 @@ function mostrarSenhaTemporaria(texto, senha) {
 // ---- Mapa ----
 // o mapa é sempre escuro (fundo da Esri); as cores do contorno e dos nomes foram escolhidas para ele
 const COR = { ambar: '#F5B83D', ambarForte: '#FFD27A', cinza: '#93A1AF', info: '#5AA9FF', erro: '#B42318', verde: '#1B8A8A' };
-let mapa, camadaConcessao, camadaComunidades, camadaUcs, telaUcs, camadaBase, camadaNomes, camadaRede, telaRede, atribuicao;
+let mapa, camadaConcessao, camadaComunidades, camadaUcs, telaUcs, camadaBase, camadaNomes, camadaCidades, caixasNomes = [], camadaRede, telaRede, atribuicao;
 // a partir deste zoom, o contorno das comunidades dos municípios na tela; a partir do outro, os nomes escritos
 const ZOOM_COMUNIDADES = 11, ZOOM_NOMES = 13, ZOOM_TRAFOS = 14, ZOOM_NOMES_AFETADAS = 10;
+const ZOOM_CIDADES = [6, 12];   // faixa de zoom em que o nome de cada cidade da concessão aparece
 const CREDITO_REDE = 'Rede fictícia sobre as vias do © OpenStreetMap';
 const CORES_ALIMENTADOR = ['#1663C7', '#7A4FD1', '#0F8F86', '#C2410C', '#9D174D', '#4D7C0F', '#0E7490', '#A16207'];
 const buscando = new Set();   // municípios cujas comunidades estão sendo buscadas
@@ -476,6 +478,40 @@ function iniciarMapa() {
     { attribution: 'Fundo &copy; Esri', maxZoom: 16, noWrap: true }).addTo(mapa);
   mapa.setView([-21.0, -42.6], 8);
   mapa.on('moveend', aoMoverMapa);
+  mapa.on('click', () => { if (estado.evidencia) { estado.evidencia = null; aplicarEvidencia(); } });
+}
+
+// comunidade em evidência (clique): borda branca grossa e as demais mais apagadas
+const chaveComunidade = f => `${f.properties.m?.nome ?? f.properties.municipio}|${f.properties.nome}|${f.properties.distrito}`;
+function comEvidencia(estilo, f) {
+  if (!estado.evidencia) return estilo;
+  if (estado.evidencia.chave === chaveComunidade(f))
+    return { ...estilo, color: '#FFFFFF', weight: 3.5, opacity: 1, dashArray: null, fillColor: estilo.fillColor || COR.ambar, fillOpacity: Math.max(estilo.fillOpacity || 0, .3) };
+  return { ...estilo, opacity: (estilo.opacity ?? 1) * .5, fillOpacity: (estilo.fillOpacity || 0) * .5 };
+}
+
+const estiloBase = f => comEvidencia({ color: COR.cinza, weight: .5, opacity: .3, fillOpacity: 0 }, f);
+const estiloAviso = f => comEvidencia(!f.properties.c ? { color: COR.cinza, weight: .5, opacity: .3, fillOpacity: 0 } : ({
+  inteira: { color: COR.ambarForte, weight: 2, fillColor: COR.ambar, fillOpacity: .4 },
+  parte: { color: COR.ambarForte, weight: 2, dashArray: '5 4', fillColor: COR.ambar, fillOpacity: .15 },
+  vizinha: { color: COR.cinza, weight: 1, opacity: .7, fillColor: COR.cinza, fillOpacity: .2 },
+})[situacao(f.properties.c)], f);
+
+function aplicarEvidencia() {
+  camadaBase?.setStyle(estiloBase);
+  camadaComunidades?.setStyle(estiloAviso);
+  for (const camada of [camadaBase, camadaComunidades])
+    camada?.eachLayer(l => { if (estado.evidencia?.chave === chaveComunidade(l.feature)) l.bringToFront(); });
+  desenharNomes();
+}
+
+// clique numa comunidade: põe em evidência (e aproxima); clicar de novo tira
+function evidenciar(e, l) {
+  L.DomEvent.stopPropagation(e);
+  const chave = chaveComunidade(l.feature);
+  estado.evidencia = estado.evidencia?.chave === chave ? null : { chave };
+  aplicarEvidencia();
+  if (estado.evidencia) mapa.fitBounds(l.getBounds(), { padding: [60, 60], maxZoom: 14 });
 }
 
 // municípios da concessão que aparecem na tela (pelo retângulo do contorno)
@@ -493,9 +529,12 @@ function desenharBase() {
     .flatMap(m => estado.territorios[m.codigo_ibge].features.map(f => ({ ...f, properties: { ...f.properties, municipio: m.nome } })));
   if (!feicoes.length) return;
   camadaBase = L.geoJSON({ type: 'FeatureCollection', features: feicoes }, {
-    style: { color: COR.cinza, weight: .5, opacity: .3, fillOpacity: 0 },
-    onEachFeature: (f, l) => l.bindTooltip(() => no('span', {
-      texto: `${semSufixo(f.properties.nome)} (${distritoDe(f.properties.distrito, f.properties.municipio)}) · ${f.properties.municipio}` }), { sticky: true }),
+    style: estiloBase,
+    onEachFeature: (f, l) => {
+      l.bindTooltip(() => no('span', {
+        texto: `${semSufixo(f.properties.nome)} (${distritoDe(f.properties.distrito, f.properties.municipio)}) · ${f.properties.municipio}` }), { sticky: true });
+      l.on('click', e => evidenciar(e, l));
+    },
   }).addTo(mapa);
   camadaBase.bringToBack();
   camadaConcessao?.bringToBack();
@@ -506,27 +545,51 @@ function desenharBase() {
 function desenharNomes() {
   camadaNomes?.remove();
   camadaNomes = null;
+  caixasNomes = [];
   if (!mapa) return;
   // com um aviso na tela, as comunidades afetadas levam o nome desde o zoom ZOOM_NOMES_AFETADAS (em destaque,
   // e primeiro na disputa por espaço); os nomes das demais só de perto
   const afetadas = new Set();
   for (const m of estado.resultado?.municipios || []) for (const c of m.comunidades) afetadas.add(`${m.codigo_ibge}|${c.nome}`);
-  const zoom = mapa.getZoom();
-  if (zoom < (afetadas.size ? ZOOM_NOMES_AFETADAS : ZOOM_NOMES)) return;
+  const zoom = mapa.getZoom(), evidencia = estado.evidencia?.chave;
+  if (zoom < (afetadas.size || evidencia ? ZOOM_NOMES_AFETADAS : ZOOM_NOMES)) return;
   const tela = mapa.getBounds().pad(.2), marcas = [], ocupado = [];
   const candidatas = municipiosNaTela().flatMap(m => (estado.territorios[m.codigo_ibge]?.features || [])
-    .map(f => ({ f, afetada: afetadas.has(`${m.codigo_ibge}|${f.properties.nome}`) })))
-    .filter(({ f, afetada }) => f.properties.rotulo && tela.contains(f.properties.rotulo) && (afetada || zoom >= ZOOM_NOMES))
-    .sort((a, b) => b.afetada - a.afetada || b.f.properties.enderecos - a.f.properties.enderecos);
-  for (const { f, afetada } of candidatas) {
+    .map(f => ({ f, afetada: afetadas.has(`${m.codigo_ibge}|${f.properties.nome}`), destaque: evidencia === chaveComunidade({ properties: { ...f.properties, municipio: m.nome } }) })))
+    .filter(({ f, afetada, destaque }) => f.properties.rotulo && tela.contains(f.properties.rotulo) && (destaque || afetada || zoom >= ZOOM_NOMES))
+    .sort((a, b) => b.destaque - a.destaque || b.afetada - a.afetada || b.f.properties.enderecos - a.f.properties.enderecos);
+  for (const { f, afetada, destaque } of candidatas) {
     const nome = semSufixo(f.properties.nome), c = mapa.latLngToContainerPoint(f.properties.rotulo);
     const caixa = { x0: c.x - nome.length * 3.4 - 4, x1: c.x + nome.length * 3.4 + 4, y0: c.y - 9, y1: c.y + 9 };  // ~6,8 px por letra
-    if (ocupado.some(o => caixa.x0 < o.x1 && o.x0 < caixa.x1 && caixa.y0 < o.y1 && o.y0 < caixa.y1)) continue;
+    if (!destaque && ocupado.some(o => caixa.x0 < o.x1 && o.x0 < caixa.x1 && caixa.y0 < o.y1 && o.y0 < caixa.y1)) continue;
     ocupado.push(caixa);
     marcas.push(L.marker(f.properties.rotulo, { interactive: false, keyboard: false,
-      icon: L.divIcon({ className: afetada ? 'rotulo afetada' : 'rotulo', html: no('span', { texto: nome }), iconSize: null }) }));
+      icon: L.divIcon({ className: destaque ? 'rotulo afetada destaque' : afetada ? 'rotulo afetada' : 'rotulo', html: no('span', { texto: nome }), iconSize: null }) }));
   }
+  caixasNomes = ocupado;
   if (marcas.length) camadaNomes = L.layerGroup(marcas).addTo(mapa);
+}
+
+// nome de cada cidade da concessão (no centro do retângulo do contorno), da mais extensa para a menos; um nome que
+// encostaria em outro já escrito (de cidade ou de comunidade) fica para um zoom maior. O nome entra como texto.
+function desenharCidades() {
+  camadaCidades?.remove();
+  camadaCidades = null;
+  const zoom = mapa?.getZoom();
+  if (!mapa || !camadaConcessao || zoom < ZOOM_CIDADES[0] || zoom > ZOOM_CIDADES[1]) return;
+  const tela = mapa.getBounds().pad(.1), marcas = [], ocupado = [...caixasNomes];
+  const area = b => (b.getNorth() - b.getSouth()) * (b.getEast() - b.getWest());
+  const cidades = camadaConcessao.getLayers().map(l => ({ p: l.feature.properties, b: l.getBounds() }))
+    .filter(({ b }) => tela.contains(b.getCenter())).sort((a, c) => area(c.b) - area(a.b));
+  for (const { p, b } of cidades) {
+    const nome = p.nome, c = mapa.latLngToContainerPoint(b.getCenter()), meia = nome.length * 4.2 + 6;  // ~8,4 px por letra
+    const caixa = { x0: c.x - meia, x1: c.x + meia, y0: c.y - 11, y1: c.y + 11 };
+    if (ocupado.some(o => caixa.x0 < o.x1 && o.x0 < caixa.x1 && caixa.y0 < o.y1 && o.y0 < caixa.y1)) continue;
+    ocupado.push(caixa);
+    marcas.push(L.marker(b.getCenter(), { interactive: false, keyboard: false,
+      icon: L.divIcon({ className: 'rotulo cidade', html: no('span', { texto: nome }), iconSize: null }) }));
+  }
+  if (marcas.length) camadaCidades = L.layerGroup(marcas).addTo(mapa);
 }
 
 // rede elétrica FICTÍCIA dos municípios na tela (de perto): média tensão por alimentador, subestação,
@@ -600,7 +663,7 @@ async function buscarNaTela() {
 
 async function aoMoverMapa() {
   if (mapa.getZoom() >= ZOOM_COMUNIDADES && estado.tela === 'app') await buscarNaTela();
-  desenharBase(); desenharNomes(); desenharRede();
+  desenharBase(); desenharNomes(); desenharCidades(); desenharRede();
   document.documentElement.dataset.mapa = `z${mapa.getZoom()}`;
 }
 
@@ -633,6 +696,7 @@ function desenharConcessao() {
     },
   }).addTo(mapa);
   camadaConcessao.bringToBack();
+  desenharCidades();
 }
 
 function desenharComunidades() {
@@ -649,18 +713,15 @@ function desenharComunidades() {
     for (const f of terr.features) {
       const c = porNome.get(f.properties.nome);
       if (c) feicoes.push({ ...f, properties: { ...f.properties, m, c } });
-      else outras.push(f);
+      else outras.push({ ...f, properties: { ...f.properties, municipio: m.nome } });
     }
   }
   if (!feicoes.length) return;
   camadaComunidades = L.geoJSON({ type: 'FeatureCollection', features: [...outras, ...feicoes] }, {
-    style: f => !f.properties.c ? { color: COR.cinza, weight: .5, opacity: .3, fillOpacity: 0 } : ({
-      inteira: { color: COR.ambarForte, weight: 2, fillColor: COR.ambar, fillOpacity: .4 },
-      parte: { color: COR.ambarForte, weight: 2, dashArray: '5 4', fillColor: COR.ambar, fillOpacity: .15 },
-      vizinha: { color: COR.cinza, weight: 1, opacity: .7, fillColor: COR.cinza, fillOpacity: .2 },
-    })[situacao(f.properties.c)],
+    style: estiloAviso,
     onEachFeature: (f, l) => {
       const { c, m } = f.properties;
+      l.on('click', e => evidenciar(e, l));
       if (!c) return l.bindTooltip(() => no('span', { texto: `${semSufixo(f.properties.nome)} · fora do aviso` }), { sticky: true });
       l.bindTooltip(() => no('span', {}, no('strong', { texto: nomeComDistrito(c, m) }), ` · ${ROTULO[situacao(c)]}`, no('br'),
         `${fmt(c.afetadas)} UCs afetadas · ${fmt(c.total)} endereços na comunidade`), { sticky: true });
@@ -821,7 +882,7 @@ async function trocarSenha(evento) {
 function limparTela() {
   Object.assign(estado, { usuario: null, resultado: null, origem: null, avisos: {}, finais: {}, formulario: null, arquivo: null,
     historico: [], usuarios: [], perfis: {}, empresas: [], registro: [], mensagem: '', erro: false,
-    passo: 1, painel: null, filtroHistorico: { busca: '', periodo: '' } });
+    passo: 1, painel: null, evidencia: null, filtroHistorico: { busca: '', periodo: '' } });
   for (const id of ['abas', 'resumo', 'municipios', 'problemasCorpo', 'listaHistorico', 'listaUsuarios', 'listaEmpresas', 'listaRegistro', 'roteiro',
     'painelDash', 'contagemHistorico'])
     $(id).replaceChildren();
@@ -877,7 +938,7 @@ function irParaPasso(n) {
 // começa outro desligamento: tira o resultado do envio anterior da tela e do mapa (o histórico já o guardou)
 function novoAviso() {
   if (estado.origem === 'novo') {
-    Object.assign(estado, { resultado: null, origem: null, avisos: {}, finais: {}, formulario: null });
+    Object.assign(estado, { resultado: null, origem: null, avisos: {}, finais: {}, formulario: null, evidencia: null });
     for (const a of [...Object.values(estado.audios), ...Object.values(estado.audiosHoje)]) URL.revokeObjectURL(a.url);
     estado.audios = {}; estado.audiosHoje = {};
     for (const id of ['resumo', 'municipios', 'problemasCorpo']) $(id).replaceChildren();
@@ -893,7 +954,7 @@ function novoAviso() {
 }
 
 async function mostrarResultado(resultado, origem, formulario) {
-  estado.resultado = resultado; estado.origem = origem; estado.formulario = formulario;
+  estado.resultado = resultado; estado.origem = origem; estado.formulario = formulario; estado.evidencia = null;
   estado.avisos = Object.fromEntries(resultado.municipios.map(m => [m.codigo_ibge, m.texto_final || m.aviso]));
   estado.finais = Object.fromEntries(resultado.municipios.filter(m => m.texto_final).map(m => [m.codigo_ibge, m.texto_final]));
   desenharResultado(); desenharConcessao();

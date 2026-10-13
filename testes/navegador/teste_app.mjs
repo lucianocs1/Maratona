@@ -164,6 +164,16 @@ const ucs = readFileSync(PLANILHA, 'utf-8').split(/\r?\n/).slice(1).filter(Boole
   conferir('botão esconde e mostra as UCs', escondeu && await p.avaliar(`camadaUcs?.getLayers().length === 758`));
   conferir('resumo: 758 linhas e o prazo de 5 dias úteis', /758/.test(tela.resumo) && /5 dias úteis/.test(tela.resumo), tela.resumo);
   await captura(p, '2_resultado.png');
+  await p.avaliar(`(camadaComunidades.getLayers().find(l => l.feature.properties.c).fire('click', { originalEvent: {} }), 0)`);
+  await espera(600);
+  const ev = await p.avaliar(`(() => { const ls = camadaComunidades.getLayers(), s = ls.find(l => estado.evidencia?.chave === chaveComunidade(l.feature));
+    return { achou: !!s, borda: s?.options.color, peso: s?.options.weight, outras: ls.filter(l => l !== s && l.feature.properties.c).every(l => l.options.opacity <= .5 || l.options.fillOpacity < .3),
+      nome: !!document.querySelector('#mapa .rotulo.destaque') }; })()`);
+  conferir('mapa: clicar numa comunidade a põe em evidência (borda branca, nome em destaque, as outras apagadas)',
+    ev.achou && ev.borda === '#FFFFFF' && ev.peso > 3 && ev.outras && ev.nome, JSON.stringify(ev));
+  await captura(p, '2d_evidencia.png');
+  await p.avaliar(`(camadaComunidades.getLayers().find(l => estado.evidencia && estado.evidencia.chave === chaveComunidade(l.feature)).fire('click', { originalEvent: {} }), 0)`);
+  conferir('mapa: clicar de novo tira a evidência', await p.avaliar(`!estado.evidencia && !document.querySelector('#mapa .rotulo.destaque')`));
   await p.avaliar(`($('avancarResultado').click(), 0)`);
   const avisos = await p.avaliar(`({ passo: estado.passo, resumo: ${visivel('resumo')}, texto: !!document.querySelector('#municipios textarea')?.offsetParent,
     novo: ${visivel('novoAviso')}, titulo: $('tituloResultado').textContent })`);
