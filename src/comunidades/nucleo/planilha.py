@@ -15,13 +15,15 @@ OBRIGATORIAS = ("uc", "latitude", "longitude")
 OPCIONAIS = ("equipamento_vital", "classe", "local")
 # nomes de coluna aceitos para cada campo (depois de minúsculas, sem acento e com "_" no lugar de espaço)
 SINONIMOS = {
-    "uc": ("uc", "unidade_consumidora", "numero_uc", "num_uc", "n_uc", "codigo_uc", "instalacao"),
+    "uc": ("uc", "unidade_consumidora", "numero_uc", "num_uc", "n_uc", "codigo_uc", "instalacao", "numcdc"),
     "latitude": ("latitude", "lat", "y"),
     "longitude": ("longitude", "lon", "long", "lng", "x"),
     "equipamento_vital": ("equipamento_vital", "vital", "equip_vital", "aparelho_vital"),
     "classe": ("classe", "classe_uc", "categoria"),
     # o que o aviso de hoje cita para a UC (o imóvel no rural, a rua no urbano): só para o comparativo
-    "local": ("local", "local_aviso", "imovel", "nome_imovel"),
+    # a ordem importa: na base da distribuidora a coluna LOCAL é URBANO/RURAL, não o imóvel; por isso
+    # endereco vem antes de local (no modelo antigo, sem endereco, local continua valendo)
+    "local": ("local_aviso", "imovel", "nome_imovel", "endereco", "local"),
 }
 SIM = {"sim", "s", "1", "true", "verdadeiro", "x", "yes", "y"}
 NAO = {"nao", "n", "0", "false", "falso", "no", ""}
