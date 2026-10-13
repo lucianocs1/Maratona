@@ -112,12 +112,12 @@ button.prim:hover:not(:disabled) { filter: none; background: var(--teal-forte); 
 .legenda:not(.minimizada) .legenda-topo { margin-bottom: 2px; border-bottom: 1px solid var(--linha); padding-bottom: 4px; }
 .legenda.minimizada .legenda-topo button { color: var(--texto); font-weight: 600; }
 .amostra { width: 18px; height: 12px; border-radius: 3px; flex: none; }
-.amostra.inteira { background: rgba(245, 184, 61, .6); border: 1.5px solid #B07800; }
-.amostra.parte { background: rgba(245, 184, 61, .22); border: 1.5px dashed #B07800; }
+.amostra.inteira { background: rgba(245, 184, 61, .6); border: 2px solid #FFD27A; }
+.amostra.parte { background: rgba(245, 184, 61, .3); border: 2px dashed #FFD27A; }
 .amostra.vizinha { background: rgba(147, 161, 175, .25); border: 1px solid #93A1AF; }
-.amostra.municipio { border: 2.5px solid var(--info); }
-.amostra.outra { border: 1px solid #93A1AF; }
-.amostra.uc { width: 10px; height: 10px; margin: 0 4px; border-radius: 50%; background: #B07800; border: 1px solid #FFFFFF; box-shadow: 0 0 0 1px #93A1AF; }
+.amostra.municipio { border: 3px solid #5AA9FF; }
+.amostra.outra { border: 1px solid rgba(147, 161, 175, .4); }
+.amostra.uc { width: 10px; height: 10px; margin: 0 4px; border-radius: 50%; background: #FFD27A; border: 1px solid #FFFFFF; box-shadow: 0 0 0 1px #93A1AF; }
 .amostra.uc.fora { background: #B42318; }
 .legenda li.legenda-ucs { display: grid; gap: 6px; margin-top: 4px; padding-top: 8px; border-top: 1px solid var(--linha); }
 .legenda-ucs > span { display: flex; align-items: center; gap: 8px; }
@@ -136,7 +136,8 @@ button.prim:hover:not(:disabled) { filter: none; background: var(--teal-forte); 
 /* nome escrito de cada comunidade (de perto), centrado no ponto */
 .rotulo { width: 0; height: 0; }
 .rotulo span { position: absolute; transform: translate(-50%, -50%); white-space: nowrap; font-size: 11.5px; font-weight: 500;
-  color: var(--texto2); text-shadow: 0 0 3px var(--sup), 0 0 3px var(--sup), 0 0 2px var(--sup); pointer-events: none; }
+  color: #C9D3DC; text-shadow: 0 0 3px #0E1620, 0 0 3px #0E1620, 0 0 2px #0E1620; pointer-events: none; }
+.rotulo.afetada span { color: #FFE2A8; font-size: 12.5px; font-weight: 700; text-shadow: 0 0 3px #0E1620, 0 0 3px #0E1620, 0 0 4px #0E1620; }
 
 /* ---------- Acesso: entrar, trocar a senha, conta no topo ---------- */
 [hidden] { display: none !important; }

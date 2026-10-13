@@ -459,11 +459,11 @@ function mostrarSenhaTemporaria(texto, senha) {
 }
 
 // ---- Mapa ----
-const escuro = () => matchMedia('(prefers-color-scheme: dark)').matches;
-const COR = { ambar: '#F5B83D', ambarForte: '#B07800', cinza: '#93A1AF', info: '#1663C7', erro: '#B42318', verde: '#1B8A8A' };
+// o mapa é sempre escuro (fundo da Esri); as cores do contorno e dos nomes foram escolhidas para ele
+const COR = { ambar: '#F5B83D', ambarForte: '#FFD27A', cinza: '#93A1AF', info: '#5AA9FF', erro: '#B42318', verde: '#1B8A8A' };
 let mapa, camadaConcessao, camadaComunidades, camadaUcs, telaUcs, camadaBase, camadaNomes, camadaRede, telaRede, atribuicao;
 // a partir deste zoom, o contorno das comunidades dos municípios na tela; a partir do outro, os nomes escritos
-const ZOOM_COMUNIDADES = 11, ZOOM_NOMES = 13, ZOOM_TRAFOS = 14;
+const ZOOM_COMUNIDADES = 11, ZOOM_NOMES = 13, ZOOM_TRAFOS = 14, ZOOM_NOMES_AFETADAS = 10;
 const CREDITO_REDE = 'Rede fictícia sobre as vias do © OpenStreetMap';
 const CORES_ALIMENTADOR = ['#1663C7', '#7A4FD1', '#0F8F86', '#C2410C', '#9D174D', '#4D7C0F', '#0E7490', '#A16207'];
 const buscando = new Set();   // municípios cujas comunidades estão sendo buscadas
@@ -472,7 +472,7 @@ function iniciarMapa() {
   if (mapa) return;
   mapa = L.map('mapa', { zoomControl: true, attributionControl: false, minZoom: 5, maxZoom: 16 });
   atribuicao = L.control.attribution({ prefix: 'Concessão e comunidades: IBGE · Leaflet' }).addTo(mapa);
-  L.tileLayer(`https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_${escuro() ? 'Dark' : 'Light'}_Gray_Base/MapServer/tile/{z}/{y}/{x}`,
+  L.tileLayer(`https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}`,
     { attribution: 'Fundo &copy; Esri', maxZoom: 16, noWrap: true }).addTo(mapa);
   mapa.setView([-21.0, -42.6], 8);
   mapa.on('moveend', aoMoverMapa);
@@ -493,7 +493,7 @@ function desenharBase() {
     .flatMap(m => estado.territorios[m.codigo_ibge].features.map(f => ({ ...f, properties: { ...f.properties, municipio: m.nome } })));
   if (!feicoes.length) return;
   camadaBase = L.geoJSON({ type: 'FeatureCollection', features: feicoes }, {
-    style: { color: COR.cinza, weight: .8, fillOpacity: 0 },
+    style: { color: COR.cinza, weight: .5, opacity: .3, fillOpacity: 0 },
     onEachFeature: (f, l) => l.bindTooltip(() => no('span', {
       texto: `${semSufixo(f.properties.nome)} (${distritoDe(f.properties.distrito, f.properties.municipio)}) · ${f.properties.municipio}` }), { sticky: true }),
   }).addTo(mapa);
@@ -506,18 +506,25 @@ function desenharBase() {
 function desenharNomes() {
   camadaNomes?.remove();
   camadaNomes = null;
-  if (!mapa || mapa.getZoom() < ZOOM_NOMES) return;
+  if (!mapa) return;
+  // com um aviso na tela, as comunidades afetadas levam o nome desde o zoom ZOOM_NOMES_AFETADAS (em destaque,
+  // e primeiro na disputa por espaço); os nomes das demais só de perto
+  const afetadas = new Set();
+  for (const m of estado.resultado?.municipios || []) for (const c of m.comunidades) afetadas.add(`${m.codigo_ibge}|${c.nome}`);
+  const zoom = mapa.getZoom();
+  if (zoom < (afetadas.size ? ZOOM_NOMES_AFETADAS : ZOOM_NOMES)) return;
   const tela = mapa.getBounds().pad(.2), marcas = [], ocupado = [];
-  const candidatas = municipiosNaTela().flatMap(m => estado.territorios[m.codigo_ibge]?.features || [])
-    .filter(f => f.properties.rotulo && tela.contains(f.properties.rotulo))
-    .sort((a, b) => b.properties.enderecos - a.properties.enderecos);
-  for (const f of candidatas) {
+  const candidatas = municipiosNaTela().flatMap(m => (estado.territorios[m.codigo_ibge]?.features || [])
+    .map(f => ({ f, afetada: afetadas.has(`${m.codigo_ibge}|${f.properties.nome}`) })))
+    .filter(({ f, afetada }) => f.properties.rotulo && tela.contains(f.properties.rotulo) && (afetada || zoom >= ZOOM_NOMES))
+    .sort((a, b) => b.afetada - a.afetada || b.f.properties.enderecos - a.f.properties.enderecos);
+  for (const { f, afetada } of candidatas) {
     const nome = semSufixo(f.properties.nome), c = mapa.latLngToContainerPoint(f.properties.rotulo);
     const caixa = { x0: c.x - nome.length * 3.4 - 4, x1: c.x + nome.length * 3.4 + 4, y0: c.y - 9, y1: c.y + 9 };  // ~6,8 px por letra
     if (ocupado.some(o => caixa.x0 < o.x1 && o.x0 < caixa.x1 && caixa.y0 < o.y1 && o.y0 < caixa.y1)) continue;
     ocupado.push(caixa);
     marcas.push(L.marker(f.properties.rotulo, { interactive: false, keyboard: false,
-      icon: L.divIcon({ className: 'rotulo', html: no('span', { texto: nome }), iconSize: null }) }));
+      icon: L.divIcon({ className: afetada ? 'rotulo afetada' : 'rotulo', html: no('span', { texto: nome }), iconSize: null }) }));
   }
   if (marcas.length) camadaNomes = L.layerGroup(marcas).addTo(mapa);
 }
@@ -616,8 +623,8 @@ function desenharConcessao() {
       ? { color: contagem[f.properties.codigo_ibge] ? COR.verde : COR.cinza, weight: contagem[f.properties.codigo_ibge] ? 1.5 : .8,
           fillColor: COR.verde, fillOpacity: contagem[f.properties.codigo_ibge] ? .15 + .55 * contagem[f.properties.codigo_ibge] / maxAvisos : .03 }
       : afetados.has(f.properties.codigo_ibge)
-        ? { color: COR.info, weight: 2.5, fillOpacity: 0 }
-        : { color: COR.cinza, weight: .8, fillColor: COR.cinza, fillOpacity: .05 },
+        ? { color: COR.info, weight: 3, fillOpacity: 0 }
+        : { color: COR.cinza, weight: .8, opacity: .6, fillColor: COR.cinza, fillOpacity: .04 },
     onEachFeature: (f, l) => {
       l.bindTooltip(() => no('span', { texto: `${f.properties.nome}/${f.properties.uf}`
         + (contagem ? ` · ${fmt(contagem[f.properties.codigo_ibge] || 0)} aviso(s)` : '') }), { sticky: true });
@@ -647,10 +654,10 @@ function desenharComunidades() {
   }
   if (!feicoes.length) return;
   camadaComunidades = L.geoJSON({ type: 'FeatureCollection', features: [...outras, ...feicoes] }, {
-    style: f => !f.properties.c ? { color: COR.cinza, weight: .8, fillOpacity: 0 } : ({
-      inteira: { color: COR.ambarForte, weight: 1.5, fillColor: COR.ambar, fillOpacity: .55 },
-      parte: { color: COR.ambarForte, weight: 1.5, dashArray: '5 4', fillColor: COR.ambar, fillOpacity: .22 },
-      vizinha: { color: COR.cinza, weight: 1, fillColor: COR.cinza, fillOpacity: .25 },
+    style: f => !f.properties.c ? { color: COR.cinza, weight: .5, opacity: .3, fillOpacity: 0 } : ({
+      inteira: { color: COR.ambarForte, weight: 2, fillColor: COR.ambar, fillOpacity: .4 },
+      parte: { color: COR.ambarForte, weight: 2, dashArray: '5 4', fillColor: COR.ambar, fillOpacity: .15 },
+      vizinha: { color: COR.cinza, weight: 1, opacity: .7, fillColor: COR.cinza, fillOpacity: .2 },
     })[situacao(f.properties.c)],
     onEachFeature: (f, l) => {
       const { c, m } = f.properties;
@@ -659,7 +666,12 @@ function desenharComunidades() {
         `${fmt(c.afetadas)} UCs afetadas · ${fmt(c.total)} endereços na comunidade`), { sticky: true });
     },
   }).addTo(mapa);
-  mapa.fitBounds(camadaComunidades.getBounds(), { padding: [30, 30], maxZoom: 13 });
+  // o zoom enquadra só as comunidades afetadas (não o município inteiro) e deixa de lado municípios com
+  // menos de 10% das UCs (um ponto isolado longe do resto não pode afastar o mapa)
+  const total = r.municipios.reduce((s, m) => s + m.ucs, 0);
+  const principais = new Set(r.municipios.filter(m => m.ucs >= total * .1).map(m => m.codigo_ibge));
+  const foco = feicoes.filter(f => principais.has(f.properties.m.codigo_ibge));
+  mapa.fitBounds(L.geoJSON({ type: 'FeatureCollection', features: foco.length ? foco : feicoes }).getBounds(), { padding: [30, 30], maxZoom: 13 });
 }
 
 // pontos das UCs da planilha: só os do envio atual, desenhados num canvas (nada no HTML) e sem o
