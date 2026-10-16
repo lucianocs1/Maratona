@@ -18,6 +18,7 @@ const estado = {
   origem: null,            // 'novo' | 'historico'
   avisos: {},              // codigo_ibge -> texto do aviso (editável)
   finais: {},              // codigo_ibge -> texto final já guardado no histórico
+  ia: {},                  // codigo_ibge -> { verificado, motivos, provedor, pedindo }: o último pedido ao copiloto de IA
   territorios: {},         // codigo_ibge -> GeoJSON das comunidades
   audios: {},              // codigo_ibge -> { texto, url (blob local), segundos }: o MP3 do texto atual
   audiosHoje: {},          // codigo_ibge -> { url, segundos }: o MP3 do aviso de hoje (comparativo)
@@ -30,6 +31,8 @@ const estado = {
   historico: [], usuarios: [], perfis: {}, empresas: [], registro: [],
   filtroHistorico: { busca: '', periodo: '' },
   painel: null,            // /api/painel: números do histórico da empresa
+  radio: null,             // { preco, veiculacoes }: o preço do spot e as veiculações (começam na configuração; o operador pode mudar)
+  pergunta: null,          // "Pergunte ao painel": { pedindo } | { resposta } | { erro }
 };
 
 const VISTAS = [  // vista, rótulo, ação exigida
@@ -82,6 +85,16 @@ const audioLigado = () => estado.config?.audio !== false;
 const temAudio = () => audioLigado() && estado.formulario?.idioma === 'pt-BR';
 
 // 754 s -> "12 min 34 s"
+// a rádio cobra por inserção (spot) inteira: 100 s em spots de 30 s são 4 spots (as mesmas contas de nucleo/custo.py)
+const spotsDe = s => s > 0 ? Math.ceil(s / estado.config.radio.spot_segundos) : 0;
+const custoDe = s => Math.round(spotsDe(s) * estado.radio.preco * estado.radio.veiculacoes * 100) / 100;
+const temPreco = () => !!estado.radio && estado.radio.preco > 0;
+const reais = v => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+const rotuloSpots = n => `${fmt(n)} spot${n === 1 ? '' : 's'}`;
+const numeroDigitado = (texto, min, max, inteiro) => {
+  const n = Number(String(texto).trim().replace(',', '.'));
+  return Number.isFinite(n) && n >= min && n <= max && (!inteiro || Number.isInteger(n)) ? n : null;
+};
 const tempoNoAr = s => s < 60 ? `${fmt(s)} s` : `${fmt(Math.floor(s / 60))} min${s % 60 ? ` ${s % 60} s` : ''}`;
 
 const palavras = texto => texto.trim().split(/\s+/).filter(Boolean).length;
@@ -255,6 +268,7 @@ function desenharMunicipios() {
       no('div', { classe: 'bloco-aviso' },
       no('label', { for: area.id, texto: editavel ? 'Aviso para a rádio (pode editar)' : 'Aviso para a rádio' }), area,
       no('p', { classe: 'tempo', id: `tempo-${cod}`, texto: tempoTexto(texto) }),
+      blocoCopiloto(cod),
       no('p', { id: `final-${cod}`, classe: 'ajuda' }),
       no('div', { classe: 'acoes' },
         no('button', { type: 'button', classe: 'prim', 'data-acao': 'pdf', 'data-codigo': cod, texto: 'Baixar PDF para a rádio' }),
@@ -267,7 +281,34 @@ function desenharMunicipios() {
         : 'O áudio do aviso está desligado neste servidor.' })));
   });
   $('municipios').replaceChildren(...cartoes);
-  for (const m of estado.resultado.municipios) { desenharFinal(m.codigo_ibge); desenharTocador(m.codigo_ibge); }
+  for (const m of estado.resultado.municipios) { desenharFinal(m.codigo_ibge); desenharTocador(m.codigo_ibge); desenharCopiloto(m.codigo_ibge); }
+}
+
+// copiloto de IA: pede ao servidor uma versão do aviso (mais curto, WhatsApp...); o servidor confere o resultado
+// contra o aviso original e a tela mostra se foi aprovado
+const iaConfig = () => estado.config?.ia;
+const copilotoLigado = () => !!iaConfig()?.ativa && pode('gerar_aviso') && !!estado.resultado?.id;
+
+function blocoCopiloto(cod) {
+  if (!copilotoLigado()) return null;
+  const c = iaConfig();
+  return no('div', { classe: 'copiloto' },
+    no('p', { classe: 'ajuda', texto: c.provedor === 'simulado' ? 'Copiloto de IA (simulado nesta demonstração)' : 'Copiloto de IA' }),
+    no('div', { classe: 'acoes' }, Object.entries(c.pedidos).map(([k, rotulo]) =>
+      no('button', { type: 'button', 'data-acao': 'ia', 'data-pedido': k, 'data-codigo': cod, texto: rotulo }))),
+    no('div', { classe: 'ia-livre' },
+      no('input', { id: `ia-livre-${cod}`, maxlength: c.max_livre, placeholder: 'Ou escreva um pedido…', 'aria-label': 'Pedido livre ao copiloto' }),
+      no('button', { type: 'button', 'data-acao': 'ia', 'data-pedido': 'livre', 'data-codigo': cod, texto: 'Pedir' })),
+    no('p', { id: `ia-status-${cod}`, classe: 'ajuda', role: 'status' }));
+}
+
+function desenharCopiloto(codigo) {
+  const lugar = $(`ia-status-${codigo}`), r = estado.ia[codigo];
+  if (!lugar) return;
+  lugar.replaceChildren(...(!r ? [] : r.pedindo ? ['Pensando…'] : r.verificado
+    ? [no('span', { classe: 'selo final', texto: 'Verificado' }), ' mantém todas as comunidades, a data, o horário e o telefone do aviso. Confira antes de usar.']
+    : [no('span', { classe: 'selo recusado', texto: 'Recusado' }), ` ${r.motivos.length ? r.motivos.join('; ') : r.erro}. O texto anterior foi mantido.`]));
+  for (const b of document.querySelectorAll(`button[data-acao="ia"][data-codigo="${codigo}"]`)) b.disabled = !!r?.pedindo;
 }
 
 function desenharFinal(codigo) {
@@ -343,13 +384,31 @@ function desenharHistorico() {
 }
 
 // ---- Comparativo: o aviso de hoje (fazenda a fazenda) x o aviso por comunidade ----
+function linhaCusto(spotsHoje, spotsFarol) {
+  const p = temPreco(), v = estado.radio.veiculacoes;
+  const parte = n => `${rotuloSpots(n)}${p ? ` · ${reais(n * estado.radio.preco * v)}` : ''}`;
+  const sufixo = v > 1 ? ` em ${fmt(v)} veiculações` : ' por veiculação';
+  return `Rádio (spots de ${estado.config.radio.spot_segundos} s): ` + (spotsHoje === null ? `Farol ${parte(spotsFarol)}.`
+    : `hoje ${parte(spotsHoje)} · Farol ${parte(spotsFarol)}` + (p ? ` · economia de ${reais((spotsHoje - spotsFarol) * estado.radio.preco * v)}${sufixo}.` : '.'));
+}
+
+function desenharCusto() {
+  const ligado = !!estado.config?.radio && !!estado.radio;
+  $('custoRadio').hidden = !ligado;
+  if (!ligado) return;
+  const c = estado.config.radio;
+  $('custoRadioAjuda').textContent = `A rádio cobra por inserção (spot) de ${c.spot_segundos} s, não por segundo. ` +
+    (c.preco_spot > 0 ? `Preço de referência, a confirmar com a emissora${c.fonte ? `: ${c.fonte}` : '.'} Mude o valor para recalcular.` : 'Informe o preço do spot para ver o valor em reais.');
+}
+
 function desenharComparativo() {
   const c = estado.painel?.comparativo;
   $('comparativoTotal').replaceChildren(...(c && c.municipios ? [no('div', { classe: 'cartao comp-total' },
     no('h2', { texto: 'Em todo o histórico da empresa' }),
     no('p', { texto: `${fmt(c.municipios)} aviso(s) por município com o aviso de hoje: ${tempoNoAr(c.segundos_hoje)} no ar fazenda a fazenda `
       + `(${fmt(c.locais)} locais citados) contra ${tempoNoAr(c.segundos_farol)} por comunidade (${fmt(c.comunidades)} comunidades).` }),
-    no('p', { classe: 'comp-economia', texto: `${fmt(Math.round(100 * (1 - c.segundos_farol / Math.max(1, c.segundos_hoje))))}% menos tempo no ar` }))] : []));
+    no('p', { classe: 'comp-economia', texto: `${fmt(Math.round(100 * (1 - c.segundos_farol / Math.max(1, c.segundos_hoje))))}% menos tempo no ar` }),
+    estado.radio ? no('p', { classe: 'comp-custo', texto: linhaCusto(c.spots_hoje, c.spots_farol) }) : null)] : []));
   const r = estado.resultado;
   if (!r) return $('comparativo').replaceChildren(no('p', { classe: 'ajuda cartao',
     texto: 'Gere um aviso em "Novo aviso" (com a coluna local na planilha) ou abra um aviso do Histórico para comparar.' }));
@@ -377,7 +436,8 @@ function desenharComparativo() {
     return no('article', { classe: 'cartao comp', 'data-codigo': cod },
       no('div', { classe: 'mun-cab' }, no('h2', { texto: `${m.nome}/${m.uf}` }),
         hoje ? no('span', { classe: 'comp-economia', texto: `${fmt(Math.round(100 * (1 - seg / Math.max(1, hoje.segundos))))}% menos tempo no ar` }) : null),
-      barras, no('div', { classe: 'comp-lados' }, ladoHoje, ladoFarol));
+      barras, estado.radio ? no('p', { classe: 'comp-custo', texto: linhaCusto(hoje ? spotsDe(hoje.segundos) : null, spotsDe(seg)) }) : null,
+      no('div', { classe: 'comp-lados' }, ladoHoje, ladoFarol));
   }));
 }
 
@@ -419,6 +479,44 @@ function desenharPainel() {
   $('painelDash').replaceChildren(kpis, meses, proximos,
     ranking('Municípios com mais avisos', d.municipios, i => `${i.nome}/${i.uf}`, 'Nenhum aviso ainda.'),
     ranking('Comunidades mais citadas', d.comunidades, i => `${semSufixo(i.nome)} (${i.municipio})`, 'Nenhum aviso ainda.'));
+}
+
+// ---- Pergunte ao painel: a IA escolhe uma consulta fixa; os números vêm do histórico da empresa ----
+const perguntaLigada = () => !!estado.config?.ia?.ativa;
+
+function descreverConsulta(r) {
+  const p = r.parametros, partes = [p.periodo_dias ? `últimos ${fmt(p.periodo_dias)} dias` : 'todo o histórico'];
+  if (p.municipio) partes.push(p.municipio);
+  return `${r.rotulo} · ${partes.join(' · ')}`;
+}
+
+function respostaDaPergunta(p) {
+  if (!p) return [];
+  if (p.pedindo) return [no('p', { classe: 'ajuda', texto: 'Consultando o histórico…' })];
+  if (p.erro) return [no('p', { classe: 'alerta', texto: p.erro })];
+  const r = p.resposta;
+  if (!r.entendida) return [no('p', { classe: 'resposta-texto', texto: r.resposta }),
+    no('ul', { classe: 'proximos' }, r.exemplos.map(t => no('li', { texto: t })))];
+  const t = r.tabela;
+  return [no('p', { classe: 'resposta-texto', texto: r.resposta }),
+    t.linhas.length ? no('div', { classe: 'tabela-rolavel' }, no('table', { classe: 'tabela-pergunta' },
+      no('thead', {}, no('tr', {}, t.colunas.map(c => no('th', { texto: c })))),
+      no('tbody', {}, t.linhas.map(l => no('tr', {}, l.map(v => no('td', { texto: typeof v === 'number' ? fmt(v) : v }))))))) : null,
+    no('p', { classe: 'ajuda' }, no('span', { classe: 'selo final', texto: 'Conferido' }),
+      ` Consulta: ${descreverConsulta(r)}. ` + (r.resposta_por === 'ia'
+        ? 'Texto escrito pela IA; todos os números dele estão na tabela.' : 'Texto montado a partir da tabela.'))];
+}
+
+function desenharPergunta() {
+  $('perguntaPainel').hidden = !perguntaLigada();
+  if (!perguntaLigada()) return;
+  const c = estado.config.ia;
+  $('perguntaAjuda').textContent = (c.provedor === 'simulado' ? 'IA simulada nesta demonstração (entende perguntas simples). ' : '')
+    + 'Escreva a pergunta em português. A IA só escolhe a consulta; os números vêm sempre do histórico da empresa.';
+  $('textoPergunta').maxLength = c.max_pergunta;
+  $('botaoPergunta').disabled = !!estado.pergunta?.pedindo;
+  $('exemplosPergunta').replaceChildren(...c.perguntas_exemplo.map(t => no('button', { type: 'button', classe: 'chip-pergunta', 'data-pergunta': t, texto: t })));
+  $('respostaPergunta').replaceChildren(...respostaDaPergunta(estado.pergunta));
 }
 
 function desenharUsuarios() {
@@ -827,6 +925,11 @@ async function abrirApp() {
   $('faixa').textContent = estado.config.aviso_ficticio;
   $('idioma').replaceChildren(...Object.entries(estado.config.idiomas).map(([k, nome]) => no('option', { value: k, texto: nome })));
   $('idioma').value = estado.config.idioma_padrao;
+  estado.radio = { preco: estado.config.radio.preco_spot, veiculacoes: estado.config.radio.veiculacoes };
+  $('precoSpot').value = String(estado.radio.preco).replace('.', ',');
+  $('veiculacoes').value = String(estado.radio.veiculacoes);
+  desenharCusto();
+  desenharPergunta();
   desenharConcessao();
   mapa.fitBounds(camadaConcessao.getBounds(), { padding: [20, 20] });
   await irPara(estado.vista);
@@ -882,10 +985,12 @@ async function trocarSenha(evento) {
 function limparTela() {
   Object.assign(estado, { usuario: null, resultado: null, origem: null, avisos: {}, finais: {}, formulario: null, arquivo: null,
     historico: [], usuarios: [], perfis: {}, empresas: [], registro: [], mensagem: '', erro: false,
-    passo: 1, painel: null, evidencia: null, filtroHistorico: { busca: '', periodo: '' } });
+    passo: 1, painel: null, pergunta: null, radio: null, evidencia: null, filtroHistorico: { busca: '', periodo: '' } });
   for (const id of ['abas', 'resumo', 'municipios', 'problemasCorpo', 'listaHistorico', 'listaUsuarios', 'listaEmpresas', 'listaRegistro', 'roteiro',
-    'painelDash', 'contagemHistorico'])
+    'painelDash', 'contagemHistorico', 'respostaPergunta', 'exemplosPergunta'])
     $(id).replaceChildren();
+  $('textoPergunta').value = ''; $('perguntaPainel').hidden = true;
+  $('precoSpot').value = ''; $('veiculacoes').value = ''; $('custoRadio').hidden = true;
   $('arquivo').value = '';
   $('buscaHistorico').value = ''; $('periodoHistorico').value = '';
   $('resultado').hidden = true;
@@ -895,7 +1000,7 @@ function limparTela() {
   camadaUcs = null;
   $('botaoUcs').closest('li').hidden = true;
   for (const a of [...Object.values(estado.audios), ...Object.values(estado.audiosHoje)]) URL.revokeObjectURL(a.url);
-  estado.audios = {}; estado.audiosHoje = {};
+  estado.audios = {}; estado.audiosHoje = {}; estado.ia = {};
   $('comparativo').replaceChildren(); $('comparativoTotal').replaceChildren();
   document.documentElement.dataset.farol = 'saiu';
 }
@@ -940,7 +1045,7 @@ function novoAviso() {
   if (estado.origem === 'novo') {
     Object.assign(estado, { resultado: null, origem: null, avisos: {}, finais: {}, formulario: null, evidencia: null });
     for (const a of [...Object.values(estado.audios), ...Object.values(estado.audiosHoje)]) URL.revokeObjectURL(a.url);
-    estado.audios = {}; estado.audiosHoje = {};
+    estado.audios = {}; estado.audiosHoje = {}; estado.ia = {};
     for (const id of ['resumo', 'municipios', 'problemasCorpo']) $(id).replaceChildren();
     desenharComparativo();
     camadaComunidades?.remove(); camadaComunidades = null;
@@ -957,6 +1062,7 @@ async function mostrarResultado(resultado, origem, formulario) {
   estado.resultado = resultado; estado.origem = origem; estado.formulario = formulario; estado.evidencia = null;
   estado.avisos = Object.fromEntries(resultado.municipios.map(m => [m.codigo_ibge, m.texto_final || m.aviso]));
   estado.finais = Object.fromEntries(resultado.municipios.filter(m => m.texto_final).map(m => [m.codigo_ibge, m.texto_final]));
+  estado.ia = {};
   desenharResultado(); desenharConcessao();
   await Promise.all(resultado.municipios.filter(m => !estado.territorios[m.codigo_ibge]).map(async m => {
     estado.territorios[m.codigo_ibge] = await api(`/api/municipios/${m.codigo_ibge}/comunidades`);
@@ -1054,6 +1160,40 @@ async function acaoComparativo(evento) {
   }
 }
 
+async function pedirAoCopiloto(codigo, pedido) {
+  const livre = pedido === 'livre' ? $(`ia-livre-${codigo}`).value : '';
+  estado.ia[codigo] = { pedindo: true };
+  desenharCopiloto(codigo);
+  try {
+    const r = await api(`/api/historico/${estado.resultado.id}/municipios/${codigo}/reescrever`,
+      { method: 'POST', json: { texto: estado.avisos[codigo], pedido, livre } });
+    estado.ia[codigo] = { verificado: r.verificado, motivos: r.motivos, provedor: r.provedor };
+    if (r.verificado) {
+      estado.avisos[codigo] = r.texto;
+      $(`aviso-${codigo}`).value = r.texto;
+      desenharTempo(codigo);
+    }
+  } catch (e) {
+    if (e.status === 401) return;
+    estado.ia[codigo] = { verificado: false, motivos: [], erro: e.message };
+  }
+  desenharCopiloto(codigo);
+}
+
+async function perguntarAoPainel(texto) {
+  texto = texto.trim();
+  if (texto.length < 3) return;
+  estado.pergunta = { pedindo: true };
+  desenharPergunta();
+  try {
+    estado.pergunta = { resposta: await api('/api/painel/perguntar', { method: 'POST', json: { pergunta: texto } }) };
+  } catch (e) {
+    if (e.status === 401) return;
+    estado.pergunta = { erro: e.message };
+  }
+  desenharPergunta();
+}
+
 async function acao(evento) {
   const b = evento.target.closest('button[data-acao]');
   if (!b) return;
@@ -1062,10 +1202,13 @@ async function acao(evento) {
     try { await navigator.clipboard.writeText(estado.avisos[codigo]); avisar(`Aviso de ${m.nome} copiado.`); }
     catch (e) { avisar('Não foi possível copiar; selecione o texto e use Ctrl+C.', true); }
     await guardarFinal(codigo);
+  } else if (b.dataset.acao === 'ia') {
+    await pedirAoCopiloto(codigo, b.dataset.pedido);
   } else if (b.dataset.acao === 'restaurar') {
     estado.avisos[codigo] = m.aviso;
     $(`aviso-${codigo}`).value = m.aviso;
-    desenharTempo(codigo);
+    delete estado.ia[codigo];
+    desenharTempo(codigo); desenharCopiloto(codigo);
   } else if (b.dataset.acao === 'ouvir' || b.dataset.acao === 'audio') {
     b.disabled = true;
     try {
@@ -1189,6 +1332,20 @@ async function abrir() {
   $('novoAviso').addEventListener('click', novoAviso);
   $('verComparativo').addEventListener('click', () => irPara('comparativo'));
   $('comparativo').addEventListener('click', acaoComparativo);
+  // o preço e as veiculações são do operador: valor inválido volta ao que valia (a conta nunca usa lixo)
+  for (const [id, campo, min, max, inteiro] of [['precoSpot', 'preco', 0, 100000, false], ['veiculacoes', 'veiculacoes', 1, 100, true]])
+    $(id).addEventListener('change', e => {
+      const n = numeroDigitado(e.target.value, min, max, inteiro);
+      if (n === null) { avisar(`${campo === 'preco' ? 'Preço do spot' : 'Veiculações'}: informe um número de ${fmt(min)} a ${fmt(max)}${inteiro ? ' (inteiro)' : ''}.`, true); }
+      else estado.radio[campo] = n;
+      e.target.value = String(estado.radio[campo]).replace('.', ',');
+      desenharComparativo();
+    });
+  $('formPergunta').addEventListener('submit', e => { e.preventDefault(); perguntarAoPainel($('textoPergunta').value); });
+  $('exemplosPergunta').addEventListener('click', e => {
+    const b = e.target.closest('button[data-pergunta]');
+    if (b) { $('textoPergunta').value = b.dataset.pergunta; perguntarAoPainel(b.dataset.pergunta); }
+  });
   $('buscaHistorico').addEventListener('input', e => { estado.filtroHistorico.busca = e.target.value; desenharHistorico(); });
   $('periodoHistorico').addEventListener('change', e => { estado.filtroHistorico.periodo = e.target.value; desenharHistorico(); });
   $('municipios').addEventListener('click', acao);

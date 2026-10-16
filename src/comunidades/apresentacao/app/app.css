@@ -87,6 +87,10 @@ button.prim:hover:not(:disabled) { filter: none; background: var(--teal-forte); 
 .mun-cab .meta { font-size: 13px; color: var(--texto2); }
 .tempo { font-size: 13px; color: var(--texto2); margin: -4px 0 0; }
 .acoes { display: flex; flex-wrap: wrap; gap: 8px; }
+.copiloto { display: grid; gap: 8px; padding: 12px; border-radius: 10px; background: var(--teal-claro); }
+.copiloto p { margin: 0; }
+.ia-livre { display: flex; gap: 8px; }
+.ia-livre input { flex: 1; min-width: 0; }
 .listas { display: grid; gap: 6px; font-size: 14px; }
 .listas p { margin: 0; }
 .listas strong { font-weight: 600; }
@@ -174,6 +178,7 @@ input[type=email], input[type=password], input:not([type]) { font: inherit; colo
 .usuario-linha .controles { display: flex; flex-wrap: wrap; gap: 6px; }
 .usuario-linha select { width: auto; }
 .selo { display: inline-block; padding: 0 8px; border-radius: 6px; font-size: 12px; font-weight: 600; background: var(--sup2); color: var(--texto2); }
+.selo.recusado { background: color-mix(in srgb, var(--erro) 18%, transparent); color: var(--texto); }
 .selo.final { background: color-mix(in srgb, var(--ok) 20%, transparent); color: var(--texto); }
 textarea[readonly] { background: var(--sup); }
 .tocador { display: grid; gap: 4px; }
@@ -340,3 +345,26 @@ input[type=search] { font: inherit; color: var(--texto); background: var(--sup);
 .comp-lado button { justify-self: start; }
 .texto-longo { max-height: 220px; overflow-y: auto; padding: 10px 12px; border-radius: 10px; background: var(--sup); border: 1px solid var(--linha);
   font-size: 14px; line-height: 1.55; white-space: pre-wrap; }
+
+/* Pergunte ao painel */
+.pergunta { display: grid; gap: 10px; margin-bottom: 16px; }
+.pergunta h2 { margin: 0; font-size: 16px; }
+.pergunta p { margin: 0; }
+.pergunta-form { display: flex; gap: 8px; }
+.pergunta-form input { flex: 1; min-width: 0; }
+.exemplos { display: flex; flex-wrap: wrap; gap: 8px; }
+.chip-pergunta { min-height: 44px; font-size: 13px; text-align: left; }
+.resposta-pergunta { display: grid; gap: 10px; }
+.resposta-texto { font-size: 15.5px; font-weight: 600; }
+.tabela-rolavel { overflow-x: auto; }
+.tabela-pergunta { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+.tabela-pergunta th, .tabela-pergunta td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--linha); }
+.tabela-pergunta td { font-variant-numeric: tabular-nums; }
+
+/* Custo no ar (comparativo) */
+.custo-radio { display: grid; gap: 10px; margin-bottom: 14px; }
+.custo-radio h2 { margin: 0; font-size: 16px; }
+.custo-radio p { margin: 0; }
+.custo-campos { display: flex; flex-wrap: wrap; gap: 12px; }
+.custo-campos label { display: grid; gap: 4px; font-size: 13px; color: var(--texto2); flex: 1 1 150px; }
+.comp-custo { margin: 0; font-size: 14px; font-weight: 600; font-variant-numeric: tabular-nums; }

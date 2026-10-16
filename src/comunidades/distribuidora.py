@@ -12,6 +12,7 @@ from pathlib import Path
 
 from . import config as C
 from .nucleo import idiomas
+from .nucleo.custo import SPOT_SEGUNDOS, TabelaRadio
 from .nucleo.desligamento import RegrasAviso
 from .nucleo.perfis_carga import NIVEIS, TIPOS_DIA, Expediente, expediente_de_dict, perfis_de_dict
 
@@ -37,6 +38,7 @@ class Distribuidora:
     razao_muito_pior: float
     raio_rede_m: float
     perfis: dict
+    radio: TabelaRadio
 
     def para_mapa(self) -> dict:
         """O que a apresentação precisa saber da distribuidora (nada de dados de clientes)."""
@@ -87,6 +89,28 @@ def _validar_perfis(d: dict) -> dict:
     return perfis
 
 
+def _radio(d: dict) -> TabelaRadio:
+    """[radio] é opcional: sem a seção, o preço fica 0 e a tela mostra os spots sem o valor em reais."""
+    r = d.get("radio")
+    if r is None:
+        return TabelaRadio()
+    if not isinstance(r, dict):
+        raise ConfiguracaoInvalida("[radio] deve ser uma seção")
+    spot = r.get("spot_segundos", SPOT_SEGUNDOS)
+    preco = r.get("spot_reais", 0.0)
+    vezes = r.get("veiculacoes", 1)
+    fonte = r.get("fonte", "")
+    if isinstance(spot, bool) or not isinstance(spot, int) or not 5 <= spot <= 120:
+        raise ConfiguracaoInvalida(f"radio.spot_segundos deve ser um inteiro de 5 a 120, veio {spot!r}")
+    if isinstance(preco, bool) or not isinstance(preco, (int, float)) or not 0 <= preco <= 100_000:
+        raise ConfiguracaoInvalida(f"radio.spot_reais deve ser um número de 0 a 100000, veio {preco!r}")
+    if isinstance(vezes, bool) or not isinstance(vezes, int) or not 1 <= vezes <= 100:
+        raise ConfiguracaoInvalida(f"radio.veiculacoes deve ser um inteiro de 1 a 100, veio {vezes!r}")
+    if not isinstance(fonte, str) or len(fonte) > 300:
+        raise ConfiguracaoInvalida("radio.fonte deve ser um texto de até 300 caracteres")
+    return TabelaRadio(spot, float(preco), vezes, fonte.strip())
+
+
 def carregar(arquivo: str | Path | None = None) -> Distribuidora:
     caminho = Path(arquivo or os.environ.get(VARIAVEL) or PADRAO)
     with open(caminho, "rb") as f:
@@ -117,4 +141,5 @@ def carregar(arquivo: str | Path | None = None) -> Distribuidora:
         razao_muito_pior=_exigir(d, "janela.razao_muito_pior", float),
         raio_rede_m=_exigir(d, "obra.raio_rede_m", float),
         perfis=perfis_de_dict(_validar_perfis(d)),
+        radio=_radio(d),
     )

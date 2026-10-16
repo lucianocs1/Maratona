@@ -31,6 +31,12 @@ limiar_total = 0.9                          # >= 90% das UCs da comunidade afeta
 limite_fragmento = 2                        # até 2 UCs afetadas...
 limite_participacao = 0.10                  # ...e < 10% das UCs da chave -> "localidades vizinhas"
 
+[radio]
+spot_segundos = 30          # a rádio cobra por inserção (spot) de 30 segundos
+spot_reais = 80.0           # preço de REFERÊNCIA por spot, em reais (a confirmar com a emissora; a tela deixa mudar)
+veiculacoes = 1             # quantas vezes o aviso vai ao ar
+fonte = "Referência de mercado para rádio local (Música 360: R$ 30 a R$ 100 por spot de 30 s; sem tabela pública de Minas); confirmar com a emissora."
+
 [obra]
 raio_rede_m = 500           # ponto da obra: distância máxima até a rede de média tensão, em metros (a confirmar)
 

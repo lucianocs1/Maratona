@@ -34,6 +34,14 @@ limiar_total = 0.0             # fração das UCs de uma comunidade a partir da 
 limite_fragmento = 0           # até quantas UCs afetadas uma comunidade parcial pode virar "localidades vizinhas"
 limite_participacao = 0.0      # ...e abaixo de que fração das UCs da chave (ex.: 0.10)
 
+# Opcional: custo do aviso no ar (a rádio cobra por inserção/spot de 30 s). Sem esta seção, o comparativo
+# mostra os spots mas não o valor em reais. O preço é de referência; confirme com a emissora.
+# [radio]
+# spot_segundos = 30
+# spot_reais = 0.0
+# veiculacoes = 1
+# fonte = ""                   # de onde vem o preço
+
 [obra]
 raio_rede_m = 0             # ponto da obra: distância máxima até a rede de média tensão, em metros (ex.: 500)
 

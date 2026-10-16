@@ -19,6 +19,7 @@ import urllib.request
 from pathlib import Path
 
 os.environ["FAROL_ESQUEMA"] = "teste_app"
+os.environ["FAROL_IA"] = "simulado"   # o teste não gasta crédito nem depende da internet, mesmo com o .env em anthropic
 
 from comunidades.api.acesso import hash_senha  # noqa: E402
 from comunidades.banco import acesso as banco  # noqa: E402

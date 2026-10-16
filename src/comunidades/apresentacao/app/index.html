@@ -119,6 +119,16 @@
     <section id="vista-painel" class="vista" hidden aria-labelledby="tituloPainel">
       <h1 id="tituloPainel">Dashboard</h1>
       <p class="ajuda">Números do histórico de avisos da empresa, só agregados. No mapa, os municípios pela quantidade de avisos.</p>
+      <section id="perguntaPainel" class="cartao pergunta" hidden aria-labelledby="tituloPergunta">
+        <h2 id="tituloPergunta">Pergunte ao painel</h2>
+        <p class="ajuda" id="perguntaAjuda">Escreva a pergunta em português. A IA escolhe a consulta; os números vêm sempre do histórico da empresa.</p>
+        <form id="formPergunta" class="pergunta-form">
+          <input id="textoPergunta" autocomplete="off" aria-label="Pergunta sobre o histórico de avisos" placeholder="Ex.: quais municípios tiveram mais avisos no último trimestre?">
+          <button type="submit" class="prim" id="botaoPergunta">Perguntar</button>
+        </form>
+        <div id="exemplosPergunta" class="exemplos"></div>
+        <div id="respostaPergunta" class="resposta-pergunta" role="status" aria-live="polite"></div>
+      </section>
       <div id="painelDash" class="dash"></div>
     </section>
 
@@ -127,6 +137,14 @@
       <h1 id="tituloComparativo">Comparativo do aviso</h1>
       <p class="ajuda">O aviso como é hoje, imóvel por imóvel e rua por rua, ao lado do aviso por comunidade do Farol, para o aviso aberto
         (o último gerado ou um do histórico). O aviso de hoje sai da coluna <code>local</code> da planilha.</p>
+      <section id="custoRadio" class="cartao custo-radio" hidden aria-labelledby="tituloCusto">
+        <h2 id="tituloCusto">Quanto custa no ar</h2>
+        <p class="ajuda" id="custoRadioAjuda"></p>
+        <div class="custo-campos">
+          <label>Preço do spot (R$) <input id="precoSpot" inputmode="decimal" autocomplete="off"></label>
+          <label>Veiculações do aviso <input id="veiculacoes" inputmode="numeric" autocomplete="off"></label>
+        </div>
+      </section>
       <div id="comparativoTotal"></div>
       <div id="comparativo" class="lista"></div>
     </section>

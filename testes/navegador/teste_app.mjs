@@ -188,12 +188,48 @@ const ucs = readFileSync(PLANILHA, 'utf-8').split(/\r?\n/).slice(1).filter(Boole
   conferir('comparativo: o aviso de hoje igual ao da API, ao lado do aviso por comunidade, com a economia de tempo',
     comp.textos[0]?.[0] === m0.hoje?.texto && comp.textos[0]?.[1] === m0.aviso && /^\d+% menos tempo no ar$/.test(comp.economia || '')
     && comp.numeros?.startsWith(`${m0.hoje.locais} locais`), JSON.stringify({ economia: comp.economia, numeros: comp.numeros, hoje: comp.textos[0]?.[0]?.slice(0, 80) }));
+  // custo no ar: a rádio cobra por spot de 30 s; o preço de referência vem da configuração e o operador pode mudar
+  const brl = v => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }).replace(/\s/g, ' ');
+  const spH = Math.ceil(m0.hoje.segundos / 30), spF = Math.ceil(m0.segundos / 30);
+  await ate(p, `document.querySelector('#comparativoTotal .comp-custo')`);
+  const custo1 = await p.avaliar(`({ campo: !$('custoRadio').hidden, preco: $('precoSpot').value, ajuda: $('custoRadioAjuda').textContent,
+    cartao: document.querySelector('#comparativo .comp .comp-custo')?.textContent.replace(/\\s/g, ' '),
+    total: document.querySelector('#comparativoTotal .comp-custo')?.textContent.replace(/\\s/g, ' ') })`);
+  const esperadoCartao = `Rádio (spots de 30 s): hoje ${spH} spot${spH === 1 ? '' : 's'} · ${brl(spH * 80)} · Farol ${spF} spot${spF === 1 ? '' : 's'} · ${brl(spF * 80)} · economia de ${brl((spH - spF) * 80)} por veiculação.`;
+  conferir('custo: preço de referência de R$ 80 por spot de 30 s, spots inteiros, economia e aviso "a confirmar com a emissora"',
+    custo1.campo && custo1.preco === '80' && /a confirmar com a emissora/.test(custo1.ajuda) && custo1.cartao === esperadoCartao, JSON.stringify({ custo1, esperadoCartao }));
+  conferir('custo: o total da empresa também mostra spots e reais', /^Rádio \(spots de 30 s\): hoje \d+ spots? · R\$ [\d.,]+ · Farol \d+ spots? · R\$ [\d.,]+ · economia de R\$ [\d.,]+ por veiculação\.$/.test(custo1.total || ''), custo1.total);
+  await p.avaliar(`($('precoSpot').value = '120,50', $('precoSpot').dispatchEvent(new Event('change', { bubbles: true })), 0)`);
+  await p.avaliar(`($('veiculacoes').value = '3', $('veiculacoes').dispatchEvent(new Event('change', { bubbles: true })), 0)`);
+  const custo2 = await p.avaliar(`document.querySelector('#comparativo .comp .comp-custo').textContent.replace(/\\s/g, ' ')`);
+  conferir('custo: mudar o preço e as veiculações recalcula (R$ 120,50 x 3)', custo2.includes(brl(spH * 120.5 * 3)) && custo2.includes('em 3 veiculações'), custo2);
+  await p.avaliar(`($('precoSpot').value = 'abc', $('precoSpot').dispatchEvent(new Event('change', { bubbles: true })), 0)`);
+  conferir('custo: preço inválido volta ao valor anterior e avisa', await p.avaliar(`$('precoSpot').value === '120,5' && estado.erro && estado.radio.preco === 120.5`));
+  await p.avaliar(`($('precoSpot').value = '80', $('precoSpot').dispatchEvent(new Event('change', { bubbles: true })), $('veiculacoes').value = '1', $('veiculacoes').dispatchEvent(new Event('change', { bubbles: true })), 0)`);
   await captura(p, '7_comparativo.png');
   await p.avaliar(`(document.querySelector('#comparativo [data-comp="hoje"]').click(), 0)`);
   conferir('comparativo: Ouvir o aviso de hoje (longo) toca o áudio', await ate(p, `document.querySelector('#comparativo [id^="tocador-hoje-"] audio')`));
   await p.avaliar(`irPara('aviso')`);
 
   const cod = esperado.municipios[0].codigo_ibge;
+
+  // copiloto de IA (simulado nos testes): reescreve, o servidor confere, e "Desfazer edição" volta ao aviso da API
+  const ia0 = await p.avaliar(`({ aviso: $('aviso-${cod}').value, botoes: document.querySelectorAll('[data-acao=ia][data-codigo="${cod}"]').length,
+    rotulo: document.querySelector('#municipios .copiloto .ajuda')?.textContent })`);
+  conferir('copiloto: botões dos pedidos e o aviso de que a IA é simulada', ia0.botoes === 5 && /simulado/.test(ia0.rotulo || ''), JSON.stringify(ia0));
+  await p.avaliar(`(document.querySelector('[data-acao=ia][data-pedido=curto][data-codigo="${cod}"]').click(), 0)`);
+  await ate(p, `/Verificado|Recusado/.test($('ia-status-${cod}').textContent)`);
+  const ia1 = await p.avaliar(`({ texto: $('aviso-${cod}').value, status: $('ia-status-${cod}').textContent, estado: estado.avisos['${cod}'] })`);
+  conferir('copiloto: "Mais curto" volta verificado, mais curto e com a mesma data e horário', /^Verificado/.test(ia1.status)
+    && ia1.texto.length < ia0.aviso.length && ia1.texto === ia1.estado && ia1.texto.includes('20/11') && ia1.texto.includes('8h'), JSON.stringify(ia1).slice(0, 300));
+  await captura(p, '2f_copiloto.png');
+  await p.avaliar(`(document.querySelector('[data-acao=ia][data-pedido=livre][data-codigo="${cod}"]').click(), 0)`);
+  await ate(p, `/Recusado/.test($('ia-status-${cod}').textContent)`);
+  const ia2 = await p.avaliar(`({ texto: $('aviso-${cod}').value, status: $('ia-status-${cod}').textContent })`);
+  conferir('copiloto: pedido livre vazio é recusado na tela e o texto é mantido', ia2.texto === ia1.texto && /Recusado/.test(ia2.status), JSON.stringify(ia2));
+  await p.avaliar(`(document.querySelector('[data-acao=restaurar][data-codigo="${cod}"]').click(), 0)`);
+  conferir('copiloto: Desfazer edição volta ao aviso original e limpa o selo', await p.avaliar(`$('aviso-${cod}').value === ${JSON.stringify(ia0.aviso)}
+    && !$('ia-status-${cod}').textContent`));
   const antes = await p.avaliar(`$('tempo-${cod}').textContent`);
   await p.avaliar(`(() => { const a = $('aviso-${cod}'); a.value = a.value + ' Mais informações pelo telefone da distribuidora.'; a.dispatchEvent(new Event('input', { bubbles: true })); return 0; })()`);
   const depois = await p.avaliar(`$('tempo-${cod}').textContent`);
@@ -275,6 +311,20 @@ const ucs = readFileSync(PLANILHA, 'utf-8').split(/\r?\n/).slice(1).filter(Boole
   conferir('dashboard: 2 avisos, 12 meses, Leopoldina no topo e pintada no mapa',
     /^Avisos gerados2/.test(dash.kpis[0]) && dash.barras === 12 && dash.legenda && dash.leopoldina > .3 && dash.top === 'Leopoldina/MG', JSON.stringify(dash));
   await captura(p, '6_dashboard.png');
+  // "Pergunte ao painel" (IA simulada nos testes): a pergunta vira consulta e a tabela vem do histórico
+  conferir('pergunte ao painel: cartão visível com a IA simulada e os exemplos', await p.avaliar(`!$('perguntaPainel').hidden
+    && /simulada/.test($('perguntaAjuda').textContent) && document.querySelectorAll('#exemplosPergunta button').length === estado.config.ia.perguntas_exemplo.length`));
+  await p.avaliar(`($('textoPergunta').value = 'Quais municípios tiveram mais avisos?', $('botaoPergunta').click(), 0)`);
+  await ate(p, `document.querySelector('#respostaPergunta .tabela-pergunta')`);
+  const perg = await p.avaliar(`({ texto: document.querySelector('#respostaPergunta .resposta-texto')?.textContent,
+    linhas: [...document.querySelectorAll('#respostaPergunta tbody tr')].map(l => l.textContent), rodape: document.querySelector('#respostaPergunta .ajuda')?.textContent })`);
+  conferir('pergunte ao painel: resposta com Leopoldina no topo, tabela e selo "Conferido"', /Leopoldina/.test(perg.texto || '') && /^Leopoldina\/MG/.test(perg.linhas[0] || '')
+    && /^Conferido/.test(perg.rodape || '') && /Municípios com mais avisos/.test(perg.rodape), JSON.stringify(perg));
+  await captura(p, '6b_pergunta_painel.png');
+  await p.avaliar(`($('textoPergunta').value = 'qual a capital da França?', $('botaoPergunta').click(), 0)`);
+  await ate(p, `/nenhuma consulta/.test($('respostaPergunta').textContent)`);
+  conferir('pergunte ao painel: pergunta fora do assunto não inventa resposta e mostra exemplos', await p.avaliar(`!document.querySelector('#respostaPergunta table')
+    && document.querySelectorAll('#respostaPergunta li').length === estado.config.ia.perguntas_exemplo.length`));
   await p.avaliar(`irPara('historico')`);
   conferir('saindo do dashboard, o mapa volta ao normal', await p.avaliar(`document.querySelector('.legenda-painel').hidden`));
 

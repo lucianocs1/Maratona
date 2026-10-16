@@ -8,6 +8,8 @@ foi gerado (um "05/01" gerado em dezembro é do ano seguinte).
 from collections import Counter, defaultdict
 from datetime import date, datetime, timedelta
 
+from .custo import SPOT_SEGUNDOS, spots
+
 TOP = 8            # municípios e comunidades que mais aparecem
 MESES = 12         # avisos por mês: os últimos 12 meses
 PROXIMOS = 8       # próximos desligamentos listados
@@ -31,12 +33,13 @@ def _meses(hoje: date) -> list[str]:
     return saida[::-1]
 
 
-def resumir(avisos: list[dict], hoje: date) -> dict:
+def resumir(avisos: list[dict], hoje: date, spot_segundos: int = SPOT_SEGUNDOS) -> dict:
     """Totais, avisos por mês, municípios e comunidades que mais aparecem, próximos desligamentos e
-    o número de avisos por município (para o mapa)."""
+    o número de avisos por município (para o mapa). No comparativo, os spots de rádio (a rádio cobra por
+    inserção de spot_segundos) são somados município a município: cada aviso ocupa spots inteiros."""
     ucs = segundos_soma = segundos_n = finais = cartoes = com_vital = recentes = 0
     comp = {"municipios": 0, "segundos_hoje": 0, "segundos_farol": 0, "palavras_hoje": 0, "palavras_farol": 0,
-            "locais": 0, "comunidades": 0}
+            "locais": 0, "comunidades": 0, "spots_hoje": 0, "spots_farol": 0}
     comunidades, mun = set(), {}
     mun_avisos, mun_ucs = Counter(), Counter()
     com_vezes, com_ucs, com_mun = Counter(), Counter(), {}
@@ -68,6 +71,8 @@ def resumir(avisos: list[dict], hoje: date) -> dict:
                 comp["municipios"] += 1
                 comp["segundos_hoje"] += int(m["hoje"]["segundos"])
                 comp["segundos_farol"] += int(m.get("segundos") or 0)
+                comp["spots_hoje"] += spots(int(m["hoje"]["segundos"]), spot_segundos)
+                comp["spots_farol"] += spots(int(m.get("segundos") or 0), spot_segundos)
                 comp["palavras_hoje"] += int(m["hoje"]["palavras"])
                 comp["palavras_farol"] += len(str(m.get("aviso", "")).split())
                 comp["locais"] += int(m["hoje"]["locais"])

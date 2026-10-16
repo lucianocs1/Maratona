@@ -26,12 +26,12 @@ from pyproj import Transformer
 
 from .. import distribuidora as dist_
 from ..config import sem_acento
-from ..apresentacao import audio
+from ..apresentacao import audio, copiloto
 from ..banco import acesso as banco_acesso
 from ..banco import base_territorial as banco
 from ..banco import rede as banco_rede
 from ..fontes.base_territorial import CRS_BASE
-from ..nucleo import idiomas, painel
+from ..nucleo import consultas, idiomas, painel, verificador
 from ..nucleo.afetados import BaseMunicipio, afetados, municipio_de
 from ..nucleo.desligamento import PALAVRAS_POR_SEGUNDO, aviso_antigo_de_locais, locais_de
 from ..nucleo.planilha import MAX_LINHAS, PlanilhaInvalida, modelo_csv, validar
@@ -93,7 +93,10 @@ def config(u: dict = Depends(usuario_atual)) -> dict:
             "idiomas": {k: v["nome"] for k, v in idiomas.IDIOMAS.items()}, "idioma_padrao": DIST.idioma_padrao,
             "prazo_legal_horas": DIST.prazo_legal_horas, "prazo_vital_dias_uteis": DIST.prazo_vital_dias_uteis,
             "norma": DIST.norma, "palavras_por_segundo": PALAVRAS_POR_SEGUNDO,
-            "limites": {"bytes": leitura.MAX_BYTES, "linhas": MAX_LINHAS}, "audio": AUDIO}
+            "limites": {"bytes": leitura.MAX_BYTES, "linhas": MAX_LINHAS}, "audio": AUDIO, "radio": DIST.radio.para_tela(),
+            "ia": {"ativa": copiloto.ativo(), "provedor": copiloto.nome_do_provedor(),
+                   "pedidos": {k: v[0] for k, v in copiloto.PEDIDOS.items()}, "max_livre": copiloto.MAX_LIVRE,
+                   "perguntas_exemplo": consultas.EXEMPLOS, "max_pergunta": consultas.MAX_PERGUNTA}}
 
 
 @app.get("/api/concessao")
@@ -306,12 +309,96 @@ def historico_um(id_: int, u: dict = Depends(exigir("ver_historico"))) -> dict:
     return _aviso_publico(a)
 
 
+def _avisos_do_painel(u: dict) -> list[dict]:
+    """Os avisos mais recentes da empresa do usuário, no horário de Brasília (só do histórico dele)."""
+    return [{**a, "criado_em": a["criado_em"].astimezone(BRASILIA)}
+            for a in banco_acesso.avisos(u["empresa_id"], MAX_AVISOS_PAINEL)]
+
+
 @app.get("/api/painel")
 def dashboard(u: dict = Depends(exigir("ver_historico"))) -> dict:
     """Dashboard da empresa: só agregados do histórico (nucleo/painel.py), no horário de Brasília."""
-    avisos = [{**a, "criado_em": a["criado_em"].astimezone(BRASILIA)}
-              for a in banco_acesso.avisos(u["empresa_id"], MAX_AVISOS_PAINEL)]
-    return painel.resumir(avisos, datetime.now(BRASILIA).date())
+    return painel.resumir(_avisos_do_painel(u), datetime.now(BRASILIA).date(), DIST.radio.spot_segundos)
+
+
+class PerguntaAoPainel(BaseModel):
+    pergunta: str
+
+
+@app.post("/api/painel/perguntar")
+def perguntar_ao_painel(dados: PerguntaAoPainel, u: dict = Depends(exigir("ver_historico"))) -> dict:
+    """Pergunte ao painel: a IA escolhe uma consulta fixa (nucleo/consultas.py) e o código calcula em cima
+    do histórico da própria empresa; a resposta escrita só vale se todos os números estão nos dados.
+    A IA nunca vê o histórico inteiro nem escreve SQL; ao provedor vão a pergunta e, se ele redige, a tabela
+    agregada. No registro de atividade vai só o nome da consulta, nunca a pergunta."""
+    if not copiloto.ativo():
+        raise HTTPException(503, "O copiloto está desligado neste servidor.")
+    pergunta = " ".join(dados.pergunta.split())
+    if not 3 <= len(pergunta) <= consultas.MAX_PERGUNTA:
+        raise HTTPException(422, f"Pergunta: de 3 a {consultas.MAX_PERGUNTA} caracteres.")
+    avisos = _avisos_do_painel(u)
+    conhecidos = sorted({m["nome"] for a in avisos for m in (a["municipios"] or [])})
+    try:
+        escolha = copiloto.escolher_consulta(pergunta, conhecidos)
+        nome, params = escolha if escolha else (None, {})
+        params = consultas.normalizar_parametros(nome, params) if nome else {}
+    except copiloto.CopilotoIndisponivel as e:
+        raise HTTPException(503, str(e)) from None
+    except ValueError:
+        nome, params = None, {}   # a IA escolheu uma consulta ou um parâmetro que não existe: trata como não entendida
+    provedor = copiloto.nome_do_provedor()
+    if not nome:
+        banco_acesso.registrar("perguntou ao painel", "sem consulta", u["id"], u["empresa_id"])
+        return {"entendida": False, "provedor": provedor, "exemplos": consultas.EXEMPLOS,
+                "resposta": "Não consegui ligar essa pergunta a nenhuma consulta do histórico. Tente uma destas:"}
+    tabela = consultas.executar(nome, params, avisos, datetime.now(BRASILIA).date(), DIST.radio.spot_segundos)
+    resposta, por = consultas.texto_padrao(nome, params, tabela), "padrao"
+    try:
+        escrita = copiloto.redigir_resposta(pergunta, tabela)
+    except copiloto.CopilotoIndisponivel:
+        escrita = None
+    if escrita and consultas.conferir_resposta(escrita, pergunta, params, tabela):
+        resposta, por = escrita.strip(), "ia"
+    banco_acesso.registrar("perguntou ao painel", f"consulta {nome}, resposta {por}", u["id"], u["empresa_id"])
+    return {"entendida": True, "consulta": nome, "rotulo": consultas.CATALOGO[nome][0], "parametros": params,
+            "resposta": resposta, "resposta_por": por, "tabela": tabela, "provedor": provedor}
+
+
+class PedidoReescrita(BaseModel):
+    texto: str               # o texto atual da caixa (o operador pode ter editado)
+    pedido: str              # curto, whatsapp, sms, acolhedor ou livre
+    livre: str = ""          # o pedido escrito pelo operador (só com pedido = livre)
+
+
+@app.post("/api/historico/{id_}/municipios/{codigo}/reescrever")
+def reescrever_aviso(id_: int, codigo: str, dados: PedidoReescrita, u: dict = Depends(exigir("gerar_aviso"))) -> dict:
+    """Copiloto do aviso: a IA reescreve e o verificador confere contra o aviso original do banco.
+
+    Se a conferência falhar, o texto reescrito é descartado (verificado = false) e a tela mantém o atual.
+    No registro de atividade vai só o resultado, nunca o texto."""
+    if not copiloto.ativo():
+        raise HTTPException(503, "O copiloto do aviso está desligado neste servidor.")
+    texto = dados.texto.strip()
+    if not 1 <= len(texto) <= verificador.MAX_CARACTERES:
+        raise HTTPException(422, f"Texto do aviso: de 1 a {verificador.MAX_CARACTERES} caracteres.")
+    try:
+        _, limite = copiloto.instrucao(dados.pedido, dados.livre)
+    except ValueError as e:
+        raise HTTPException(422, str(e)) from None
+    a = banco_acesso.aviso(id_, u["empresa_id"])
+    m = next((x for x in (a["municipios"] if a else []) if x["codigo_ibge"] == codigo), None)
+    if not m:
+        raise HTTPException(404, "Aviso ou município não encontrado nesta empresa.")
+    try:
+        candidato = copiloto.reescrever(texto, dados.pedido, dados.livre)
+    except copiloto.CopilotoIndisponivel as e:
+        raise HTTPException(503, str(e)) from None
+    r = verificador.verificar(m["aviso"], candidato, [c["nome"] for c in m["comunidades"]], m["nome"],
+                              limite or verificador.MAX_CARACTERES, set(DIST.nome.split()))
+    banco_acesso.registrar("reescreveu o aviso com IA", f"aviso {id_}, município {codigo}, pedido {dados.pedido}: "
+                           + ("aprovado" if r.ok else "recusado pelo verificador"), u["id"], u["empresa_id"])
+    return {"texto": candidato if r.ok else texto, "verificado": r.ok, "motivos": r.motivos,
+            "provedor": copiloto.nome_do_provedor()}
 
 
 @app.put("/api/historico/{id_}/municipios/{codigo}/texto")

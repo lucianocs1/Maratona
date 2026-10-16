@@ -21,6 +21,20 @@ ARQ_DISTRIBUIDORA = Path(os.environ.get("FAROL_DISTRIBUIDORA") or DISTRIBUIDORA_
 MUNICIPIO_PASTAS_ORIGINAIS = "3138401"
 
 
+def segredo(nome: str, padrao: str = "") -> str:
+    """Valor de uma configuração sensível ou de ambiente: a variável de ambiente ou, se não existir, a linha
+    NOME=valor do .env na raiz (o arquivo de FAROL_ENV, se definido). O .env é ignorado pelo git."""
+    if os.environ.get(nome):
+        return os.environ[nome]
+    arquivo = RAIZ / (os.environ.get("FAROL_ENV") or ".env")
+    if arquivo.exists():
+        for linha in arquivo.read_text(encoding="utf-8").splitlines():
+            chave, _, valor = linha.strip().partition("=")
+            if chave.strip() == nome and valor.strip():
+                return valor.strip().strip('"').strip("'")
+    return padrao
+
+
 def sem_acento(s: str) -> str:
     return "".join(c for c in unicodedata.normalize("NFD", s) if unicodedata.category(c) != "Mn")
 
