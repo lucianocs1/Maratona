@@ -55,7 +55,10 @@ const estado = {
   verRede: true,           // rede elétrica FICTÍCIA (demonstração), de perto; o interruptor esconde
   verClientes: false,      // clientes FICTÍCIOS da concessão (densidade de longe, pontos de perto)
   verNomes: true,          // nomes das comunidades e das cidades no mapa
+  verLocalidades: false,   // localidades oficiais do IBGE (Censo 2022), só pontos com nome
+  localidades: null,       // /api/localidades-oficiais: [lat, lon, nome, categoria, município]
   verComunidades: true,    // contorno das comunidades
+  legendaAvisoVista: false, // a legenda das comunidades já abriu sozinha com o mapa de um aviso
   resumoClientes: null,    // /api/clientes/resumo: só contagens
   clientesVista: null,     // o último pedido de /api/clientes (a janela do mapa)
   evidencia: null,         // comunidade clicada no mapa: { chave } (borda branca e nome em destaque); clicar de novo ou no mapa tira
@@ -2165,7 +2168,7 @@ function desenharRede() {
 }
 
 // ---- Camadas do mapa: interruptores, legenda de cada uma e a camada de clientes (fictícios) ----
-const CAMADAS_SALVAS = ['verComunidades', 'verNomes', 'verRede', 'verClientes'];   // lembradas neste navegador (só conveniência)
+const CAMADAS_SALVAS = ['verComunidades', 'verNomes', 'verRede', 'verClientes', 'verLocalidades'];   // lembradas neste navegador (só conveniência)
 function lerCamadas() {
   try {
     const salvas = JSON.parse(localStorage.getItem('norte.camadas') || 'null');
@@ -2188,7 +2191,11 @@ function desenharCamadas() {
   marcarCamada('botaoNomes', estado.verNomes);
   marcarCamada('botaoRede', estado.verRede);
   marcarCamada('botaoClientes', estado.verClientes);
+  marcarCamada('botaoLocalidades', estado.verLocalidades);
   $('camadaClientes').hidden = !podeVerClientes();
+  $('camadaLocalidades').hidden = !estado.usuario || ehFarol();
+  $('contagemLocalidades').hidden = !estado.localidades;
+  if (estado.localidades) $('contagemLocalidades').textContent = fmt(estado.localidades.length);
   const r = estado.resumoClientes;
   $('contagemClientes').hidden = !r;
   if (r) $('contagemClientes').textContent = fmt(r.total);
@@ -2261,6 +2268,37 @@ function desenharClientes() {
         fillColor: ESCALA_DENSIDADE[Math.min(3, Math.floor(Math.log(1 + n) / topo * 4 - 1e-9))], fillOpacity: .6 }));
   }
   camadaClientes = L.layerGroup(partes).addTo(mapa);
+}
+
+// localidades oficiais do IBGE: poucas centenas de pontos, buscados uma vez; a cor e o tamanho dizem a categoria
+const GRUPO_LOCALIDADE = { 'Cidade': 0, 'Vila': 0, 'Povoado': 1, 'Núcleo Urbano': 1, 'Núcleo Rural': 1, 'Lugarejo': 1 };   // o resto é o grupo 2
+const ESTILO_LOCALIDADE = [{ r: 6.5, cor: '#F2C14E' }, { r: 5.5, cor: '#2EC4B6' }, { r: 4.5, cor: '#C77DFF' }];
+let camadaLocalidades;
+
+function desenharLocalidades() {
+  camadaLocalidades?.remove();
+  camadaLocalidades = null;
+  if (!mapa || !estado.verLocalidades || !estado.localidades?.length) return;
+  const contorno = escuro() ? '#0B1B2B' : '#FFFFFF';
+  camadaLocalidades = L.layerGroup(estado.localidades.map(([lat, lon, nome, categoria, municipio]) => {
+    const e = ESTILO_LOCALIDADE[GRUPO_LOCALIDADE[categoria] ?? 2];
+    return L.circleMarker([lat, lon], { radius: e.r, weight: 2, color: contorno, fillColor: e.cor, fillOpacity: 1 })
+      .bindTooltip(() => no('span', { texto: t('{nome} · {categoria} · {municipio} (localidade oficial do IBGE)', { nome, categoria, municipio }) }));
+  })).addTo(mapa);
+}
+
+async function carregarLocalidades() {
+  if (!estado.usuario || ehFarol()) return;
+  try { estado.localidades = (await api('/api/localidades-oficiais')).localidades; } catch (e) { return; }
+  desenharCamadas();
+  desenharLocalidades();
+}
+
+function alternarLocalidades() {
+  alternarCamada('verLocalidades', async () => {
+    if (estado.verLocalidades && !estado.localidades) await carregarLocalidades();
+    desenharLocalidades();
+  });
 }
 
 async function alternarClientes() {
@@ -2385,6 +2423,8 @@ function desenharComunidades() {
   camadaComunidades = null;
   const r = estado.resultado;
   if (!r || naEscolha() || !estado.verComunidades) return;   // no passo 3, o mapa é o da escolha (desenharMapaEscolha)
+  // a legenda das comunidades abre sozinha na primeira vez que o mapa de um aviso aparece (depois, é do usuário)
+  if (!estado.legendaAvisoVista) { estado.legendaAvisoVista = true; if (!$('camadaComunidades').classList.contains('aberta')) expandirCamada($('camadaComunidades').querySelector('[data-expandir]')); }
   // as afetadas preenchidas; as outras comunidades dos mesmos municípios só com o contorno, por baixo
   const feicoes = [], outras = [];
   for (const m of r.municipios) {
@@ -2722,6 +2762,7 @@ async function abrirApp() {
   desenharConcessao();
   desenharIrPara();
   carregarResumoClientes();
+  carregarLocalidades();
   desenharCamadas();
   if (estado.verClientes) agendarClientes();
   atribuicao?.setPrefix(t('Concessão e comunidades: IBGE · Leaflet'));
@@ -2824,7 +2865,9 @@ function limparTela() {
   $('textoPergunta').value = ''; $('perguntaPainel').hidden = true;
   $('precoSpot').value = ''; $('veiculacoes').value = ''; $('custoRadio').hidden = true;
   $('legendaCalor').hidden = true; marcarCamada('botaoCalor', false);
-  Object.assign(estado, { resumoClientes: null, clientesVista: null }); chaveClientes = null; camadaClientes?.remove(); camadaClientes = null; desenharCamadas();
+  Object.assign(estado, { resumoClientes: null, clientesVista: null, localidades: null, legendaAvisoVista: false });
+  $('camadaComunidades').classList.remove('aberta'); $('camadaComunidades').querySelector('[data-expandir]').setAttribute('aria-expanded', 'false');
+  camadaLocalidades?.remove(); camadaLocalidades = null; chaveClientes = null; camadaClientes?.remove(); camadaClientes = null; desenharCamadas();
   $('dica').hidden = true;
   $('arquivo').value = '';
   $('buscaHistorico').value = ''; $('periodoHistorico').value = '';
@@ -4261,6 +4304,7 @@ async function abrir() {
   $('botaoUcs').addEventListener('click', () => { estado.verUcs = !estado.verUcs; desenharUcs(); });
   $('botaoRede').addEventListener('click', alternarRede);
   $('botaoClientes').addEventListener('click', alternarClientes);
+  $('botaoLocalidades').addEventListener('click', alternarLocalidades);
   $('botaoNomes').addEventListener('click', () => alternarCamada('verNomes', () => { desenharNomes(); desenharCidades(); }));
   $('botaoComunidades').addEventListener('click', () => alternarCamada('verComunidades', () => { desenharBase(); desenharComunidades(); desenharNomes(); }));
   $('legenda').addEventListener('click', e => { const b = e.target.closest('[data-expandir]'); if (b) expandirCamada(b); });

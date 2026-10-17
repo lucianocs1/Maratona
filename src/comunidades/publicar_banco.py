@@ -17,13 +17,14 @@ import time
 import psycopg
 
 from . import config as C
-from .banco import base_territorial, clientes, municipios_ibge, rede
+from .banco import base_territorial, clientes, localidades, municipios_ibge, rede
 from .banco.conexao import conectar
 
 ARQ = C.RAIZ / ".env.producao"
 TABELAS = ("municipio", "comunidade", "endereco_referencia",
            "rede_subestacao", "rede_trecho", "rede_chave", "rede_trafo",   # na ordem das chaves estrangeiras
            "cliente_ficticio",   # um cliente fictício por endereço (clientes_concessao.py): ~600 mil linhas
+           "localidade_oficial",   # localidades oficiais do IBGE (localidades_oficiais.py): ~480 linhas
            "municipio_ibge")   # os municípios do Brasil (malha do IBGE), para a área de atuação das empresas
 
 
@@ -55,6 +56,7 @@ def publicar() -> int:
             cur.execute(base_territorial.ESQUEMA)   # inclui CREATE EXTENSION postgis
             cur.execute(rede.ESQUEMA)
             cur.execute(clientes.ESQUEMA)
+            cur.execute(localidades.ESQUEMA)
             cur.execute(municipios_ibge.ESQUEMA)
             cur.execute("TRUNCATE " + ", ".join(TABELAS))
         for t in TABELAS:

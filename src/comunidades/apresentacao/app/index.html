@@ -452,10 +452,10 @@
     <ul class="legenda" id="legenda" aria-label="Camadas do mapa" data-t-aria-label="Camadas do mapa">
       <li class="legenda-topo"><button type="button" id="botaoLegenda" aria-expanded="true" aria-controls="legenda">
         <span aria-hidden="true" class="seta">▾</span> <span id="botaoLegendaTexto">Camadas</span></button></li>
-      <li class="camada aberta" id="camadaComunidades">
+      <li class="camada" id="camadaComunidades">
         <div class="camada-cab">
           <button type="button" role="switch" aria-checked="true" id="botaoComunidades" class="interruptor"><span class="trilho" aria-hidden="true"><span class="bola"></span></span><span data-t>Contornos das comunidades</span></button>
-          <button type="button" class="expandir" data-expandir="legendaComunidades" aria-expanded="true" aria-controls="legendaComunidades" aria-label="Mostrar ou esconder a legenda" data-t-aria-label="Mostrar ou esconder a legenda"><span aria-hidden="true" class="seta">▾</span></button>
+          <button type="button" class="expandir" data-expandir="legendaComunidades" aria-expanded="false" aria-controls="legendaComunidades" aria-label="Mostrar ou esconder a legenda" data-t-aria-label="Mostrar ou esconder a legenda"><span aria-hidden="true" class="seta">▾</span></button>
         </div>
         <ul class="camada-legenda" id="legendaComunidades">
           <li><span class="amostra inteira"></span><span data-t>Comunidade inteira</span></li>
@@ -500,6 +500,18 @@
           <li class="legenda-densidade"><span class="escala escala-clientes" aria-hidden="true"></span><span data-t>De longe: poucos a muitos clientes por quadradinho</span></li>
         </ul>
         <p class="camada-dica" id="dica_botaoClientes" role="status" hidden></p>
+      </li>
+      <li class="camada" id="camadaLocalidades">
+        <div class="camada-cab">
+          <button type="button" role="switch" aria-checked="false" id="botaoLocalidades" class="interruptor"><span class="trilho" aria-hidden="true"><span class="bola"></span></span><span data-t>Localidades oficiais (IBGE)</span></button><span class="contagem" id="contagemLocalidades" hidden></span>
+          <button type="button" class="expandir" data-expandir="legendaLocalidades" aria-expanded="false" aria-controls="legendaLocalidades" aria-label="Mostrar ou esconder a legenda" data-t-aria-label="Mostrar ou esconder a legenda"><span aria-hidden="true" class="seta">▾</span></button>
+        </div>
+        <ul class="camada-legenda" id="legendaLocalidades">
+          <li><span class="amostra loc-sede"></span><span data-t>Cidade e vila</span></li>
+          <li><span class="amostra loc-povoado"></span><span data-t>Povoado, núcleo e lugarejo</span></li>
+          <li><span class="amostra loc-outras"></span><span data-t>Outras localidades e quilombolas</span></li>
+          <li class="legenda-densidade"><span data-t>Os nomes oficiais do IBGE (Censo 2022); passe o mouse ou toque num ponto para ver o nome.</span></li>
+        </ul>
       </li>
       <li class="camada" id="itemCalor" hidden>
         <div class="camada-cab">

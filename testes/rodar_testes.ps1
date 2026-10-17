@@ -41,6 +41,8 @@ $testes = @(
     @{ Nome = "Pergunte ao painel (IA)";       Cmd = "uv run python -W ignore testes/api/teste_pergunta_painel.py" },
     @{ Nome = "Custo do aviso no ar (spots)";  Cmd = "uv run python -W ignore testes/api/teste_custo.py" },
     @{ Nome = "Clientes fictícios (camada)";   Cmd = "uv run python -W ignore testes/api/teste_clientes.py" },
+    @{ Nome = "Localidades: casamento de nomes"; Cmd = "uv run python -W ignore testes/nucleo/teste_localidades.py" },
+    @{ Nome = "Localidades oficiais (IBGE)";   Cmd = "uv run python -W ignore testes/api/teste_localidades.py" },
     @{ Nome = "Registro total (rotas)";        Cmd = "uv run python -W ignore testes/api/teste_registro_total.py" },
     @{ Nome = "Áudio (MP3)";                   Cmd = "uv run python -W ignore testes/api/teste_audio.py" },
     @{ Nome = "Idiomas (aviso, PDF, e-mail)";  Cmd = "uv run python -W ignore testes/api/teste_idiomas.py" },

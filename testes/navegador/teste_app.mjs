@@ -138,8 +138,8 @@ const ucs = readFileSync(PLANILHA, 'utf-8').split(/\r?\n/).slice(1).filter(Boole
   const camadas = await p.avaliar(`({ interruptores: [...document.querySelectorAll('#legenda [role=switch]')].map(b => b.id),
     cliente: !$('camadaClientes').hidden, ligadoPadrao: $('botaoClientes').getAttribute('aria-checked'),
     alvos: [...document.querySelectorAll('#legenda .interruptor, #legenda .expandir')].filter(e => e.offsetParent).every(e => e.getBoundingClientRect().height >= 43.5) })`);
-  conferir('camadas: interruptores de comunidades, nomes, rede, clientes, calor e UCs, com alvo de 44 px; clientes desligada por padrão',
-    camadas.interruptores.join() === 'botaoComunidades,botaoNomes,botaoRede,botaoClientes,botaoCalor,botaoUcs' && camadas.cliente && camadas.ligadoPadrao === 'false' && camadas.alvos, JSON.stringify(camadas));
+  conferir('camadas: interruptores de comunidades, nomes, rede, clientes, localidades, calor e UCs, com alvo de 44 px; clientes desligada por padrão',
+    camadas.interruptores.join() === 'botaoComunidades,botaoNomes,botaoRede,botaoClientes,botaoLocalidades,botaoCalor,botaoUcs' && camadas.cliente && camadas.ligadoPadrao === 'false' && camadas.alvos, JSON.stringify(camadas));
   await ate(p, `estado.resumoClientes && !$('contagemClientes').hidden`);
   const resumo = await p.avaliar(`({ total: estado.resumoClientes.total, chip: $('contagemClientes').textContent, classes: Object.keys(estado.resumoClientes.classes).join() })`);
   conferir('clientes fictícios: a contagem aparece ao lado do interruptor (só números)', resumo.total > 500000 && resumo.chip.replace(/\D/g, '') === String(resumo.total) && /Residencial/.test(resumo.classes), JSON.stringify(resumo));
@@ -167,6 +167,23 @@ const ucs = readFileSync(PLANILHA, 'utf-8').split(/\r?\n/).slice(1).filter(Boole
   await captura(p, '1f_camadas_clientes.png');
   await p.avaliar(`($('botaoClientes').click(), 0)`);
   conferir('clientes fictícios: o interruptor desliga e tira a camada', await p.avaliar(`!camadaClientes && $('botaoClientes').getAttribute('aria-checked') === 'false'`));
+  // localidades oficiais do IBGE: interruptor, um ponto por localidade com nome, categoria e município, e a contagem
+  await ate(p, `estado.localidades && !$('contagemLocalidades').hidden`);
+  conferir('localidades oficiais: 470 buscadas, com a contagem ao lado do interruptor, e a camada desligada por padrão',
+    await p.avaliar(`estado.localidades.length === 470 && $('contagemLocalidades').textContent.replace(/\D/g, '') === '470'
+      && $('botaoLocalidades').getAttribute('aria-checked') === 'false' && !camadaLocalidades`));
+  await p.avaliar(`($('botaoLocalidades').click(), 0)`);
+  await ate(p, `camadaLocalidades`);
+  const loc = await p.avaliar(`({ n: camadaLocalidades.getLayers().length, salvo: JSON.parse(localStorage.getItem('norte.camadas')).verLocalidades,
+    dica: (() => { const l = camadaLocalidades.getLayers()[0], c = l.getTooltip().getContent(); return (typeof c === 'function' ? c(l) : c).textContent; })() })`);
+  conferir('localidades oficiais: um ponto por localidade, com nome, categoria e município na dica, e o interruptor lembrado',
+    loc.n === 470 && /localidade oficial do IBGE/.test(loc.dica) && loc.salvo === true, JSON.stringify(loc));
+  await p.avaliar(`(mapa.setZoom(11), $('botaoClientes').getAttribute('aria-checked') === 'true' && $('botaoClientes').click(), 0)`);
+  await espera(700);
+  await captura(p, '1g_localidades_oficiais.png');
+  await p.avaliar(`(mapa.setZoom(16), 0)`);
+  await p.avaliar(`($('botaoLocalidades').click(), 0)`);
+  conferir('localidades oficiais: o interruptor desliga e tira os pontos', await p.avaliar(`!camadaLocalidades && $('botaoLocalidades').getAttribute('aria-checked') === 'false'`));
   await p.avaliar(`(mapa.setZoom(13), 0)`);
   await ate(p, `document.documentElement.dataset.mapa === 'z13'`);
   await p.avaliar(`(mapa.setZoom(10), 0)`);

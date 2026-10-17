@@ -223,6 +223,10 @@ button.prim:hover:not(:disabled) { filter: none; background: #F0A928; }
 .amostra.cli-publico { background: #F472B6; }
 .amostra.cli-vital { width: 14px; height: 14px; margin: 0 2px; background: #4F8FF7; border: 2px solid var(--texto); }
 .amostra.cli-inativa { background: transparent; border: 1.5px solid #4F8FF7; }
+.amostra.loc-sede, .amostra.loc-povoado, .amostra.loc-outras { width: 12px; height: 12px; margin: 0 3px; border-radius: 50%; border: 2px solid #0B1B2B; }
+.amostra.loc-sede { background: #F2C14E; }
+.amostra.loc-povoado { background: #2EC4B6; }
+.amostra.loc-outras { background: #C77DFF; }
 .escala-clientes { width: 54px; height: 10px; flex: none; border-radius: 4px; border: 1px solid var(--linha);
   background: linear-gradient(90deg, #8FD3FF, #38A1F5, #2F6BE0, #4B2FB8); }
 .amostra.rede { width: 18px; height: 0; border-radius: 0; border-top: 2.5px solid var(--info); }
