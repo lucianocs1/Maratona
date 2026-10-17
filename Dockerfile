@@ -4,8 +4,9 @@
 #   não precisa de internet para falar, e o texto do aviso não sai dele. FAROL_AUDIO=0 (build e execução)
 #   deixa a voz de fora: no plano gratuito do Render não há memória para ela (~520 MB a mais).
 # - Sem dados na imagem: a base territorial e a rede fictícia ficam no Postgres (DATABASE_URL).
-# - Roda sem ser root. A porta vem de $PORT (o Render define); --proxy-headers para o IP real de quem
-#   acessa (limite de tentativas de login) atrás do proxy HTTPS do Render.
+# - Roda sem ser root. A porta vem de $PORT (o Render define). O IP real de quem acessa (limite de
+#   tentativas de login) e o https vêm do proxy do Render pela própria API (api/proxy.py, só os itens
+#   que o proxy acrescentou; FAROL_SALTOS_PROXY); o uvicorn não confia em X-Forwarded-* (--no-proxy-headers).
 FROM python:3.12-slim
 ARG FAROL_AUDIO=1
 
@@ -31,4 +32,4 @@ RUN uv sync --frozen --no-dev \
 USER farol
 ENV PATH="/app/.venv/bin:$PATH" PORT=10000
 EXPOSE 10000
-CMD ["sh", "-c", "exec uvicorn comunidades.api.app:app --host 0.0.0.0 --port ${PORT} --proxy-headers --forwarded-allow-ips='*'"]
+CMD ["sh", "-c", "exec uvicorn comunidades.api.app:app --host 0.0.0.0 --port ${PORT} --no-proxy-headers"]

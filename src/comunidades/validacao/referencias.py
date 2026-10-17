@@ -1,7 +1,7 @@
 """Referências para os testes JS × Python: avisos e janelas por chave, gerados pelo Python.
 
 O navegador tem de reproduzir estes arquivos exatamente (mesmo texto, mesmas notas).
-avisos.json: avisos pt-BR (Farol e aviso de hoje) e o aviso nos 3 idiomas, em 2 datas e horários.
+avisos.json: avisos pt-BR (Norte e aviso de hoje) e o aviso nos 3 idiomas, em 2 datas e horários.
 janelas.json: 3 sugestões por chave, em 2 datas e 3 durações, com a nota do início às 8h.
 tamanho_hoje.json: locais, palavras e segundos do aviso de hoje por chave, nas 2 datas e horários,
 contados no texto montado (e conferidos com a conta pelos códigos de local, que o mapa usa no modo área).

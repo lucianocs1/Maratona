@@ -5,6 +5,7 @@ para o texto sair idêntico nos dois lados. Os nomes das comunidades, dos distri
 e do município nunca são traduzidos.
 """
 
+import re
 import unicodedata
 
 MESES_EN = ["January", "February", "March", "April", "May", "June", "July", "August",
@@ -112,3 +113,70 @@ def com_telefone(texto: str, telefone: str, idioma: str = PADRAO) -> str:
 
 def para_mapa() -> dict:
     return {"modelos": IDIOMAS, "mesesEn": MESES_EN, "padrao": PADRAO}
+
+
+# ---------- Data e horário do aviso no idioma (Fase K) ----------
+# O app guarda a data e o horário como o operador digitou no formato brasileiro ("20/11", "8h às 14h"):
+# é isso que o histórico mostra. No aviso e na mensagem em outro idioma, eles saem no formato de cada um.
+MESES_ES = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre",
+            "noviembre", "diciembre"]
+MESES_PT = ["janeiro", "fevereiro", "março", "abril", "maio", "junho", "julho", "agosto", "setembro", "outubro",
+            "novembro", "dezembro"]
+_DATA = re.compile(r"^\s*(\d{1,2})/(\d{1,2})(?:/(\d{4}))?\s*$")
+_HORA = r"(\d{1,2})h(\d{2})?"
+_HORARIO = re.compile(rf"^\s*{_HORA}\s+às\s+{_HORA}\s*$")
+
+
+def ler_data(data: str) -> tuple[int, int] | None:
+    """(dia, mês) de "20/11" (ou "20/11/2026"); None se não for uma data nesse formato."""
+    m = _DATA.match(str(data or ""))
+    if not m or not (1 <= int(m.group(1)) <= 31 and 1 <= int(m.group(2)) <= 12):
+        return None
+    return int(m.group(1)), int(m.group(2))
+
+
+def ler_horario(horario: str) -> tuple[int, int] | None:
+    """(início, fim) em minutos de "8h às 14h" ou "8h30 às 14h"; None se não for um horário nesse formato."""
+    m = _HORARIO.match(str(horario or ""))
+    if not m:
+        return None
+    h1, m1, h2, m2 = (int(x or 0) for x in m.groups())
+    if h1 > 23 or h2 > 23 or m1 > 59 or m2 > 59:
+        return None
+    return h1 * 60 + m1, h2 * 60 + m2
+
+
+def localizar(data: str, horario: str, idioma: str) -> tuple[str, str]:
+    """A data e o horário do aviso do algoritmo no idioma (as mesmas regras do mapa: formatar_data e formatar_horario).
+    Em português (ou se não der para ler o formato), saem como vieram: o aviso em português não muda."""
+    if idioma == PADRAO:
+        return data, horario
+    d, h = ler_data(data), ler_horario(horario)
+    return (formatar_data(*d, idioma) if d else data), (formatar_horario(*h, idioma) if h else horario)
+
+
+def data_falada(data: str, idioma: str) -> str:
+    """A data da mensagem da rádio: "20/11" em português, "November 20" em inglês, "20 de noviembre" em espanhol."""
+    d = ler_data(data)
+    if not d or idioma == PADRAO:
+        return data
+    return f"{MESES_EN[d[1] - 1]} {d[0]}" if idioma == "en" else f"{d[0]} de {MESES_ES[d[1] - 1]}"
+
+
+def hora_falada(minutos: int, idioma: str) -> str:
+    """A hora da mensagem da rádio: "8h"/"14h30" em português, "8 a.m."/"2:30 p.m." em inglês, "8:00"/"14:30" em espanhol."""
+    h, m = divmod(minutos, 60)
+    if idioma == "en":
+        return f"{h % 12 or 12}{f':{m:02d}' if m else ''} {'a.m.' if h < 12 else 'p.m.'}"
+    if idioma == "es":
+        return f"{h}:{m:02d}"
+    return f"{h}h" + (f"{m:02d}" if m else "")
+
+
+def inicio_fim(horario: str, idioma: str) -> tuple[str, str]:
+    """O início e o fim da mensagem da rádio no idioma ("8h às 14h" -> ("8 a.m.", "2 p.m.") em inglês)."""
+    h = ler_horario(horario)
+    if not h or idioma == PADRAO:
+        inicio, _, fim = str(horario).partition(" às ")
+        return inicio, fim
+    return hora_falada(h[0], idioma), hora_falada(h[1], idioma)

@@ -157,3 +157,12 @@ def comunidades_geojson(codigo: str) -> dict | None:
                     " FROM comunidade, LATERAL ST_PointOnSurface(territorio) AS p"
                     " WHERE codigo_ibge = %s ORDER BY nome", (SIMPLIFICAR_COMUNIDADE, codigo))
         return _colecao(cur.fetchall(), ["nome", "distrito", "enderecos", "rotulo"])
+
+
+def enderecos_da_comunidade(codigo: str, nome: str, distrito: str | None) -> int | None:
+    """Quantos endereços do IBGE a comunidade tem (o nome pode vir sem o sufixo de homônimo)."""
+    with conectar() as c:
+        r = c.execute("SELECT enderecos FROM comunidade WHERE codigo_ibge = %s AND (nome = %s OR nome LIKE %s)"
+                      " AND (%s::text IS NULL OR distrito = %s) ORDER BY nome = %s DESC LIMIT 1",
+                      (codigo, nome, nome + " (%", distrito or None, distrito or None, nome)).fetchone()
+    return r[0] if r else None

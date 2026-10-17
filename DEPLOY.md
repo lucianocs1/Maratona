@@ -39,3 +39,23 @@ Docker no Render, com o banco Postgres + PostGIS no Neon. Diferenças em produç
 - **Base territorial ou rede refeitas** (base_concessao, rede_concessao): rode de novo o passo 1.4.
 - **Senha perdida:** `$env:FAROL_ENV=".env.producao"; uv run python -m comunidades.semente --nova-senha EMAIL`.
 - **Saúde:** `https://farol-....onrender.com/api/saude` mostra quantos municípios o banco tem (66).
+
+## 4. Variáveis do plano final (desde 14/10/2026)
+
+O `render.yaml` já declara todas; nenhum valor vai para o git.
+
+| Variável | O que é | Como preencher no Render |
+|---|---|---|
+| `FAROL_CHAVE_PACOTE` | Chave HMAC do pacote da conferência da planilha | Gerada pelo Render (`generateValue`); não mexa |
+| `FAROL_CHAVE_ARQUIVOS` | Chave AES-256-GCM dos PDF e MP3 enviados às rádios | Gerada pelo Render; **não troque depois**: os arquivos já guardados deixariam de abrir |
+| `FAROL_URL_PUBLICA` | Endereço público do Farol, para o link "Confirmar recebimento" do e-mail | `https://farol-....onrender.com` |
+| `FAROL_SMTP_HOST`, `_PORTA`, `_USUARIO`, `_SENHA`, `_REMETENTE` (e `FAROL_SMTP_SEGURANCA`: starttls, ssl ou nenhuma) | Servidor de e-mail para mandar o aviso às rádios | Do provedor de e-mail da empresa; sem `FAROL_SMTP_HOST`, o envio por e-mail fica desligado (WhatsApp e cópia continuam) |
+
+- O banco ganha as tabelas novas (auditoria encadeada, rádios, configuração da empresa, envios e arquivos cifrados) ao rodar a semente (passo 1.5), que pode rodar de novo.
+- **Fase H** (relatórios completos): depois do deploy, rode a semente de novo no banco de produção para criar as colunas de orçamento, alerta de preço e repetição em `empresa_config` e a tabela `relatorio_via` (segunda via dos relatórios, cifrada com a mesma `FAROL_CHAVE_ARQUIVOS`); sem a chave, o PDF de relatório não é gerado (503). O usuário do app precisa de `SELECT` e `INSERT` em `relatorio_via`.
+- **Mapa das empresas e área de atuação** (15/10/2026): carregue os municípios do Brasil no banco local (`uv run python -m comunidades.municipios_brasil`, uma vez) e publique a base (`uv run python -m comunidades.publicar_banco`, que agora leva também `municipio_ibge`). Depois rode a semente no banco de produção (com o dono do banco): ela cria `empresa_municipio` e a coluna `empresa.criada_por` e dá à EMG a área que já existia. O usuário do app precisa de `SELECT`, `INSERT` e `DELETE` em `empresa_municipio` e de `SELECT` em `municipio_ibge`. Sem área cadastrada, uma empresa não gera aviso.
+- **Histórico de demonstração** para os relatórios (avisos, rádios e envios fictícios, uma vez só):
+  `$env:FAROL_ENV=".env.producao"; uv run python -m comunidades.semente_demo` (precisa de `data/sintetico/` na máquina local). Roda as duas sementes: o mês e meio recente e o ano (de janeiro até ali), cada uma uma vez só.
+- No banco de produção, o usuário do app deve poder só `SELECT` e `INSERT` na tabela `registro` (sem `UPDATE`, `DELETE` nem `TRUNCATE`), além dos gatilhos que já recusam essas operações.
+
+- **E-mail só para domínios de teste** (15/10/2026): enquanto o Farol usa dados fictícios, deixe `FAROL_EMAIL_REAL` sem valor: o servidor só envia para domínios reservados (.example etc.) e recusa os outros antes de conectar ao SMTP. Só ligue (`FAROL_EMAIL_REAL=1`) quando entrarem dados e destinatários reais, depois da revisão LGPD.

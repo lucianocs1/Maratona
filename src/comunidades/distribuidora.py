@@ -39,6 +39,7 @@ class Distribuidora:
     raio_rede_m: float
     perfis: dict
     radio: TabelaRadio
+    planilha: "ConfigPlanilha"
 
     def para_mapa(self) -> dict:
         """O que a apresentação precisa saber da distribuidora (nada de dados de clientes)."""
@@ -50,6 +51,31 @@ class Distribuidora:
 
 class ConfiguracaoInvalida(ValueError):
     pass
+
+
+@dataclass(frozen=True)
+class ConfigPlanilha:
+    """[planilha] do .toml (opcional; sem a seção valem estes padrões)."""
+    epsg_utm: int = 31983                    # fuso UTM das coordenadas X/Y (SIRGAS 2000 / UTM 23S)
+    ponto_isolado_km: float = 20.0           # ponto mais longe que isso do vizinho mais próximo: aviso
+    muitas_ucs_mesma_coordenada: int = 10    # a mesma coordenada em tantas UCs ou mais: aviso
+    limite_rejeitadas: float = 0.02          # acima disso, o aviso só sai com justificativa
+
+
+def _planilha(d: dict) -> ConfigPlanilha:
+    s = d.get("planilha", {})
+    tipos = {"epsg_utm": int, "ponto_isolado_km": (int, float), "muitas_ucs_mesma_coordenada": int,
+             "limite_rejeitadas": (int, float)}
+    for k, v in s.items():
+        if k not in tipos:
+            raise ConfiguracaoInvalida(f"planilha.{k}: campo desconhecido")
+        if isinstance(v, bool) or not isinstance(v, tipos[k]):
+            raise ConfiguracaoInvalida(f"planilha.{k}: tipo inválido")
+    c = ConfigPlanilha(**s)
+    if not (0 <= c.limite_rejeitadas <= 1 and c.ponto_isolado_km > 0 and c.muitas_ucs_mesma_coordenada >= 2
+            and 31960 <= c.epsg_utm <= 31985):
+        raise ConfiguracaoInvalida("planilha: valor fora da faixa (limite_rejeitadas 0 a 1; epsg_utm de 31960 a 31985)")
+    return c
 
 
 def _exigir(d: dict, caminho: str, tipo):
@@ -142,4 +168,5 @@ def carregar(arquivo: str | Path | None = None) -> Distribuidora:
         raio_rede_m=_exigir(d, "obra.raio_rede_m", float),
         perfis=perfis_de_dict(_validar_perfis(d)),
         radio=_radio(d),
+        planilha=_planilha(d),
     )

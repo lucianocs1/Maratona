@@ -9,12 +9,12 @@ const Modelo = (() => {
 
   // ---------- Perfis e permissões ----------
   const PERFIS = {
-    admin_farol: 'Admin do Farol',
+    admin_farol: 'Admin do Norte',
     admin_empresa: 'Admin da empresa',
     operador: 'Operador',
     consulta: 'Consulta',
   };
-  // Perfis que um usuário de empresa pode ter (o Admin do Farol não pertence a empresa)
+  // Perfis que um usuário de empresa pode ter (o Admin do Norte não pertence a empresa)
   const PERFIS_USUARIO = ['admin_empresa', 'operador', 'consulta'];
   const TIPOS_EMPRESA = { distribuidora: 'Distribuidora', cooperativa: 'Cooperativa', permissionaria: 'Permissionária' };
   const IDIOMAS = { 'pt-BR': 'Português (Brasil)', en: 'English', es: 'Español' };
@@ -206,7 +206,7 @@ const Modelo = (() => {
   }
 
   function quem(sessao, estado) {
-    if (sessao.perfil === 'admin_farol') return 'Admin do Farol';
+    if (sessao.perfil === 'admin_farol') return 'Admin do Norte';
     const e = estado.empresas.find(x => x.id === sessao.empresaId);
     return `${PERFIS[sessao.perfil]} · ${e ? e.nomeFantasia : '?'}`;
   }
@@ -223,7 +223,7 @@ const Modelo = (() => {
     estado.registro.push({ quando: agoraIso(agora), quem: quem(estado.sessao, estado), acao, alvo, empresaId: empresaId ?? null });
   }
 
-  // Registro visível: o Admin do Farol vê tudo; o admin da empresa, só o da própria empresa
+  // Registro visível: o Admin do Norte vê tudo; o admin da empresa, só o da própria empresa
   function registroVisivel(estado) {
     const s = estado.sessao;
     if (!pode(s, 'ver_registro')) return [];
@@ -360,7 +360,7 @@ const Modelo = (() => {
 
   function gerarToml(empresa, municipio, padroes, agora) {
     const linhas = [
-      `# Configuração gerada pela área administrativa do Farol (PROTÓTIPO) em ${agoraIso(agora).slice(0, 10)}.`,
+      `# Configuração gerada pela área administrativa do Norte (PROTÓTIPO) em ${agoraIso(agora).slice(0, 10)}.`,
       `# Empresa: ${str(empresa.nomeFantasia)} · município: ${str(municipio.nome)}/${empresa.uf}.`,
       '# Expediente, limites do aviso e perfis de sensibilidade vêm da demonstração (a confirmar com a empresa).',
       '# Este arquivo não contém usuários nem dados pessoais.',
@@ -401,7 +401,7 @@ const Modelo = (() => {
 
   // ---------- Registro em texto ----------
   function registroTexto(entradas) {
-    const cab = ['Farol · Registro de atividades (PROTÓTIPO: dados fictícios, só na memória do navegador)', ''];
+    const cab = ['Norte · Registro de atividades (PROTÓTIPO: dados fictícios, só na memória do navegador)', ''];
     return cab.concat(entradas.map(r => `${r.quando}\t${r.quem}\t${r.acao}\t${r.alvo}`)).join('\n') + '\n';
   }
 

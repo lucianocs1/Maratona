@@ -48,6 +48,12 @@ raio_rede_m = 0             # ponto da obra: distância máxima até a rede de m
 [janela]
 razao_muito_pior = 0.0         # razão entre notas a partir da qual a janela escolhida é "muito pior" (ex.: 1.5)
 
+[planilha]                     # opcional: sem esta seção valem os valores abaixo
+epsg_utm = 31983               # fuso UTM das colunas COORD_X/COORD_Y (SIRGAS 2000; 31982 = 22S, 31983 = 23S, 31984 = 24S)
+ponto_isolado_km = 20.0        # ponto mais longe que isso do vizinho mais próximo da planilha: aviso
+muitas_ucs_mesma_coordenada = 10   # a mesma coordenada em tantas UCs ou mais: aviso (suspeito)
+limite_rejeitadas = 0.02       # fração de linhas rejeitadas acima da qual o aviso só sai com justificativa
+
 # ---------------------------------------------------------------------------
 # Perfis de sensibilidade (um bloco por atividade, na ordem desejada).
 # Atividades usadas pelo cadastro: agropecuaria, saude, ensino, residencial, religioso, outros.

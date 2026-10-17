@@ -90,10 +90,10 @@ ok(await av(FAIXA_VISIVEL), 'faixa de protótipo visível na entrada');
 ok((await av('T.titulo()')) === 'Entrar (simulado)', 'abre na entrada simulada');
 await capturar(p, '1_entrar.png');
 
-// --- Admin do Farol ---
+// --- Admin do Norte ---
 await av("T.entrar('admin_farol')");
-ok(JSON.stringify(await av('T.menu()')) === JSON.stringify(['Empresas', 'Registro de atividades']), 'Admin do Farol: menu Empresas e Registro');
-ok((await av('T.titulo()')) === 'Empresas' && (await av('T.linhas().length')) === 2, 'Admin do Farol: lista as 2 empresas');
+ok(JSON.stringify(await av('T.menu()')) === JSON.stringify(['Empresas', 'Registro de atividades']), 'Admin do Norte: menu Empresas e Registro');
+ok((await av('T.titulo()')) === 'Empresas' && (await av('T.linhas().length')) === 2, 'Admin do Norte: lista as 2 empresas');
 await av("T.digitar('busca', 'cataguases')");
 ok((await av('T.linhas().length')) === 1 && (await av('T.linhas()[0][0]')) === 'Cooperativa Rural Exemplo', 'busca por município');
 await av("T.digitar('busca', '')");

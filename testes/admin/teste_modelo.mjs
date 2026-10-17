@@ -28,7 +28,9 @@ const agora = new Date('2026-10-10T12:00:00Z');
 const novo = () => M.criarEstado(D.demo);
 
 // ---------- O Model embutido na página é o mesmo do arquivo-fonte ----------
-ok(html.includes(fonte), 'admin.html embute exatamente o admin_modelo.js');
+// ignorando o fim de linha: no Windows o git entrega o .js com CRLF, e o gerador grava LF
+const semCR = s => s.replace(/\r\n/g, '\n');
+ok(semCR(html).includes(semCR(fonte)), 'admin.html embute exatamente o admin_modelo.js');
 
 // ---------- CNPJ ----------
 for (const c of ['11.222.333/0001-81', '11222333000181', '12.ABC.345/01DE-35', '12abc34501de35', 'FA.ROL.DEM/0001-19', 'CO.OPE.XEM/0001-27'])
@@ -91,7 +93,7 @@ for (const u of D.demo.usuarios) {
 {
   const [e1, e2] = D.demo.empresas.map(e => e.id);
   const farol = { perfil: 'admin_farol', empresaId: null }, adm1 = { perfil: 'admin_empresa', empresaId: e1 };
-  for (const a of ['ver_empresas', 'criar_empresa', 'editar_empresa', 'suspender_empresa', 'ver_registro']) ok(M.pode(farol, a, e2), `Admin do Farol: ${a}`);
+  for (const a of ['ver_empresas', 'criar_empresa', 'editar_empresa', 'suspender_empresa', 'ver_registro']) ok(M.pode(farol, a, e2), `Admin do Norte: ${a}`);
   for (const a of ['ver_usuarios', 'editar_usuario', 'ver_configuracao', 'editar_configuracao', 'gerar_toml']) {
     ok(M.pode(adm1, a, e1), `Admin da empresa: ${a} na própria`);
     ok(!M.pode(adm1, a, e2), `Admin da empresa: ${a} em outra empresa (negado)`);
@@ -148,7 +150,7 @@ for (const u of D.demo.usuarios) {
   igual(M.alternarBloqueio(s, criado.id, agora).ok, false, 'agora o novo admin é o último');
 
   M.entrar(s, 'admin_farol', null, agora);
-  ok(M.alternarEmpresa(s, e1.id, agora).ok, 'Admin do Farol suspende empresa');
+  ok(M.alternarEmpresa(s, e1.id, agora).ok, 'Admin do Norte suspende empresa');
   ok(s.usuarios.filter(u => u.empresaId === e1.id).every(u => M.situacaoUsuario(u, e1).codigo === 'bloqueado'), 'empresa suspensa: todos bloqueados');
   ok(M.alternarEmpresa(s, e1.id, agora).ok, 'reativa empresa');
 }
@@ -164,7 +166,7 @@ for (const u of D.demo.usuarios) {
   const visivel = M.registroVisivel(s);
   ok(visivel.every(r => r.empresaId === e1), 'admin da empresa só vê o registro da própria empresa');
   M.entrar(s, 'admin_farol', null, agora);
-  ok(M.registroVisivel(s).some(r => r.acao === 'criou empresa' && r.alvo.includes('<img')), 'Admin do Farol vê tudo, com o alvo em texto');
+  ok(M.registroVisivel(s).some(r => r.acao === 'criou empresa' && r.alvo.includes('<img')), 'Admin do Norte vê tudo, com o alvo em texto');
   ok(M.registroTexto(M.registroVisivel(s)).includes('alterou configuração'), 'registro em texto');
 }
 

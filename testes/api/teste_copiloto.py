@@ -126,7 +126,7 @@ municipio = {"codigo_ibge": "3138401", "nome": MUN, "uf": "MG", "ucs": 120, "seg
              "comunidades": [{"nome": n, "distrito": "Sede", "afetadas": 10, "total": 20, "parcial": False,
                               "fragmento": False, "confianca": 0.9} for n in COMUNIDADES]}
 id_ = banco_acesso.gravar_aviso(dono["empresa_id"], dono["id"], "20/11", "8h às 14h", "pt-BR",
-                                {"linhas": 120, "validas": 120, "problemas": 0, "fora_da_concessao": 0, "prazo": {}}, [municipio])
+                                {"linhas": 120, "validas": 120, "problemas": 0, "fora_da_concessao": 0, "prazo": {}}, [municipio], "manutencao_preventiva", "Manutenção preventiva", lambda i: f"aviso {i}")["id"]
 rota = f"/api/historico/{id_}/municipios/3138401/reescrever"
 pedido = {"texto": AVISO, "pedido": "whatsapp"}
 

@@ -1,136 +1,163 @@
-# Desafio 3: Fazenda por fazenda, ou uma comunidade só?
+# Norte: cada comunidade avisada pelo nome
 
-Identifica automaticamente as **comunidades afetadas por um desligamento programado**, para que o aviso no rádio cite "Braúna, Graminha e parte de Tomé Nogueira" em vez de listar sítio por sítio.
+Desafio 3 da Maratona TIVIT-RPV (Grupo Energisa): **"Fazenda por fazenda, ou uma comunidade só?"**
 
-Cenário de teste: **Leopoldina/MG** (município inteiro), com dados reais do Censo IBGE 2022. A parte da distribuidora (rede elétrica, transformadores e clientes) é **fictícia**, gerada sobre as casas reais.
+Num desligamento programado, a distribuidora tem de avisar quem fica sem energia, e no rural o aviso vai pelo rádio. Hoje ele lista imóvel por imóvel ("Sítio Boa Vista, Fazenda Cruzeiro, ...") e fica longo, caro e difícil de entender. O Norte recebe a planilha das unidades consumidoras (UCs) afetadas, descobre **as comunidades** onde elas estão e monta um aviso curto ("moradores de Graminha, Boa Sorte e parte de Tomé Nogueira"). Ele confere a planilha com travas de segurança, gera o PDF e o áudio para a rádio, manda o aviso por e-mail com confirmação de recebimento e mostra custo, economia e prazo nos relatórios.
+
+> **Dados desta demonstração:** território, endereços e comunidades são **reais** (IBGE, Censo 2022). A rede elétrica, os clientes, as rádios e o histórico são **fictícios**. Nenhum dado de cliente real foi usado.
 
 ## Resultados
 
-| Métrica | Só o cadastro digitado | Algoritmo |
+Números impressos pelo pipeline (`uv run comunidades --so-algoritmo`), iguais aos do passo 12:
+
+| Métrica (Leopoldina/MG) | Só o cadastro digitado | Norte |
 |---|---|---|
-| Comunidade correta por UC, zona rural | 56,1% | **90,9%** |
+| Comunidade correta por UC, zona rural | 56,1% | **91,2%** |
 | Comunidade correta por UC, zona urbana | 85,2% | **95,6%** |
-| Comunidades atingidas que entram no aviso (835 cenários) | – | **93,2%** |
+| Cobertura média das comunidades atingidas (835 cenários de chave) | – | **88,3%** |
+| Precisão média (835 cenários) | – | **95,0%** |
 | Duração média do aviso no rádio | 44 s | **14 s** |
 
-Exemplo, chave CF-0066 (758 UCs rurais): o aviso cai de 358 palavras (~143 s) para ~21 s, com 100% das comunidades atingidas citadas.
+Exemplo da tela (chave fictícia CF-0066, 758 UCs): o aviso de hoje cita 120 locais em 358 palavras, cerca de 2 min 23 s no ar.
 
-## Só quero ver funcionando
+## O que o Norte faz
 
-O mapa já vem pronto no repositório: abra `saida/mapa_comunidades.html` no navegador (precisa de internet para o fundo do mapa). Para abrir já simulando uma chave, use `saida/mapa_comunidades.html#CF-0066`.
+1. **Planilha → JSON validado.** A planilha (.xlsx ou .csv) passa por um portão contra arquivos maliciosos. Só as colunas do modelo são lidas (nome, número da casa e conta são descartados na hora). As coordenadas são corrigidas só quando é seguro, e cada linha sai como ok, corrigida ou rejeitada, com o motivo. Uma rotina independente relê o arquivo e confere os números.
+2. **Conferência humana.** Números, mapa com as corrigidas em roxo, alerta vermelho para equipamento vital com problema (bloqueia), amarelo para pontos suspeitos, justificativa quando as rejeições passam do limite e a caixa "Conferi os números e o mapa". Sem isso, nada é gerado.
+3. **Aviso por comunidade.** Algoritmo de comunidades sobre a base do IBGE. A mensagem sai pelo modelo editável da empresa, com o tipo de desligamento como motivo.
+4. **Rádio.** O Norte sugere as rádios pelas comunidades afetadas e avisa as que ficam "sem rádio cadastrada". O valor do envio fica gravado, junto com a economia, calculada (por minuto no ar) ou informada. O e-mail leva PDF e MP3 (voz sintetizada no próprio servidor) e o botão "Confirmar recebimento". Também há WhatsApp e cópia.
+5. **Auditoria e relatórios.** Toda ação fica registrada com o nome e o perfil de quem fez, numa corrente de hashes que não pode ser editada nem apagada. Há o relatório do período, o comprovante do aviso, a auditoria da empresa e a geral de acessos, em PDF e CSV com código de verificação.
 
-## Como rodar o projeto
+## Perfis
 
-**Pré-requisitos:** [Git](https://git-scm.com/downloads) e [uv](https://docs.astral.sh/uv/). Não é preciso instalar Python, porque o uv baixa a versão certa sozinho.
+| Perfil | O que faz | Menu |
+|---|---|---|
+| Admin do Norte | Cadastra e suspende empresas; vê a auditoria geral de acessos de todas as empresas | Empresas, Auditoria geral |
+| Admin da empresa | Tudo do Operador, mais usuários da empresa, rádios (só ele cadastra, edita, desativa e define o valor padrão; atende ou recusa os pedidos de rádio), configurações (modelo da mensagem, limite de rejeição, fuso UTM, antecedência) e o relatório de auditoria | Novo aviso, Histórico, Relatórios, Usuários, Rádios, Configurações, Auditoria |
+| Operador | Importa e confere a planilha, gera o aviso, baixa PDF e MP3, envia à rádio escolhida da lista informando o valor daquele envio, baixa o JSON com UCs (registrado) e, se faltar rádio, pede o cadastro ao Admin da empresa | Novo aviso, Histórico, Relatórios |
+| Consulta | Vê o mapa, o histórico, os comprovantes e os relatórios; não gera nem envia | Mapa, Histórico, Relatórios |
+
+A permissão é conferida **no servidor** em toda rota. O teste `testes/api/teste_matriz.py` percorre cada rota com cada perfil, e uma rota nova sem regra faz o teste falhar. Ninguém vê dados de outra empresa.
+
+## Como rodar no Windows (passo a passo)
+
+**Pré-requisitos:** [Git](https://git-scm.com/downloads), [uv](https://docs.astral.sh/uv/) (instala o Python certo sozinho), PostgreSQL 17 com PostGIS 3.6 (instalador da EDB + Stack Builder) e Node.js 22 com Edge ou Chrome (só para os testes de tela).
 
 ```powershell
-# Windows (PowerShell): instalar o uv
+# 1. uv (feche e abra o terminal depois)
 powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
+
+# 2. código e dependências
+git clone <URL-DO-REPOSITORIO>; cd <pasta>
+uv sync
+
+# 3. banco: como superusuário, crie o banco fazendadb, a extensão postgis e um usuário do app sem privilégios de admin
+#    (farol_app: só conecta, cria esquemas e tabelas). Depois, o arquivo .env na raiz (o git ignora):
+#      DATABASE_URL=postgresql://farol_app:SENHA@127.0.0.1:5432/fazendadb
+#      FAROL_CHAVE_PACOTE=<48+ caracteres aleatórios>
+#      FAROL_CHAVE_ARQUIVOS=<saída de: uv run python -c "from comunidades import cofre; print(cofre.nova_chave())">
+#      FAROL_URL_PUBLICA=http://127.0.0.1:8000
+#      FAROL_SMTP_HOST=127.0.0.1
+#      FAROL_SMTP_PORTA=1025
+#      FAROL_SMTP_SEGURANCA=nenhuma
+
+# 4. dados (primeira vez: baixa ~110 MB do IBGE)
+uv run comunidades                        # Leopoldina: base, rede e clientes fictícios, algoritmo e mapa estático
+uv run python -m comunidades.base_concessao   # base territorial dos 66 municípios da concessão no banco
+uv run python -m comunidades.rede_concessao   # rede fictícia no banco (demonstração)
+
+# 5. acesso e histórico de demonstração (as senhas temporárias aparecem uma vez)
+uv run python -m comunidades.semente
+uv run python -m comunidades.semente_demo
+
+# 6. caixa de e-mail de teste (Mailpit, em outro terminal; caixa em http://127.0.0.1:8025)
+data\raw\mailpit\mailpit.exe --smtp 127.0.0.1:1025 --listen 127.0.0.1:8025
+
+# 7. o app
+uv run uvicorn comunidades.api.app:app --host 127.0.0.1 --port 8000 --no-proxy-headers
+# abra http://127.0.0.1:8000 e entre com um dos usuários da semente
 ```
-```bash
-# Linux / macOS: instalar o uv
-curl -LsSf https://astral.sh/uv/install.sh | sh
-```
 
-Feche e abra o terminal depois de instalar. Em seguida:
+- **Só ver o mapa estático de demonstração:** abra `saida/mapa_comunidades.html` (ou `#CF-0066` no fim do endereço).
+- **Planilhas de demonstração:** `testes/planilha/exemplos/demo/` (correta, coordenadas corrigidas, equipamento vital rejeitado, muitas rejeições e maliciosa). O roteiro de 5 minutos está em [docs/DEMO.md](docs/DEMO.md).
+- **Todos os testes, com tabela no fim:** `powershell -ExecutionPolicy Bypass -File testes\rodar_testes.ps1` (`-Rapido` pula o navegador e o algoritmo).
+- **Produção (Render + Neon):** [DEPLOY.md](DEPLOY.md).
 
-```bash
-git clone <URL-DO-REPOSITORIO>
-cd <pasta-do-repositorio>
-uv sync                                # cria o ambiente e instala as dependências
-uv run comunidades                     # pipeline completo
-```
+## Idiomas
 
-- **Primeira execução:** ~5 a 8 min, porque baixa ~110 MB do IBGE e as vias do OpenStreetMap para `data/raw/`.
-- **Execuções seguintes:** ~3 min.
-- `uv run comunidades --so-algoritmo` reaproveita a rede e os clientes já gerados e roda só o algoritmo, a avaliação e o mapa. É o modo útil para quem estiver mexendo no algoritmo.
+- **Aviso** em português, inglês e espanhol: o idioma se escolhe no passo 2 do Novo aviso (padrão: o da empresa, nas Configurações). A mensagem da rádio tem um modelo por idioma, editável pelo Admin da empresa com a prévia; data e horário no formato de cada idioma ("November 20, from 8 a.m. to 2 p.m."; "el 20 de noviembre, entre las 8:00 y las 14:00"). O português ficou idêntico ao de antes.
+- **PDF da rádio, e-mail para a rádio, página de confirmação e comprovante** no idioma do aviso; o idioma fica gravado no aviso e aparece no histórico.
+- **Áudio**: português (pt_BR-faber) e inglês (en_US-ljspeech, domínio público). **Espanhol sem áudio**: nenhuma voz em espanhol com licença clara (ver ORIGEM.md); a tela avisa.
+- **Telas** em 3 idiomas (seletor no topo, também na tela de entrar; guardado no perfil do usuário): textos em `apresentacao/app/textos.js`, números, datas e moeda pelo `Intl`, `<html lang>` acompanha. Relatórios (tela, PDF, CSV) e mensagens de erro da API no idioma de quem pede.
+- Testes: `testes/api/teste_idiomas.py` (34), `testes/navegador/teste_textos.mjs` (nenhum texto sem tradução) e `teste_idiomas_tela.mjs` (cada tela sem português sobrando).
 
-Ao final, o terminal mostra as métricas, e o mapa é regravado em `saida/mapa_comunidades.html`.
+## Acessibilidade
 
-> As vias vêm do OpenStreetMap, que é atualizado continuamente. Quem baixar em outro dia pode obter uma rede fictícia um pouco diferente e números levemente diferentes.
+O botão **Acessibilidade** fica no topo de todas as telas, também na de entrar. Ele oferece:
 
-## Onde mexer para propor melhorias
+- tamanho do texto até 200%;
+- alto contraste;
+- fonte Atkinson Hyperlegible;
+- mais espaçamento;
+- reduzir movimento;
+- destacar links e foco;
+- guia de leitura;
+- modo simples;
+- leitura em voz alta pela voz do aparelho.
 
-Todos os caminhos são relativos a `src/comunidades/`.
+As escolhas ficam no perfil. Há ainda o link "Pular para o conteúdo" e a Declaração de acessibilidade (WCAG 2.2 AA,
+ABNT NBR 17225, LBI art. 63), com o formulário de relato que vai para a auditoria. O axe-core roda em todas as telas, nos
+4 perfis, nos 2 temas e nos 3 idiomas. Detalhes e o roteiro de teste manual (NVDA, TalkBack, VoiceOver, teclado e zoom)
+estão em [docs/ACESSIBILIDADE.md](docs/ACESSIBILIDADE.md).
 
-| Quero mudar... | Arquivo |
+## Arquitetura
+
+Camadas, parentes do MVC, que também separam os dados reais dos fictícios:
+
+| MVC | No projeto |
 |---|---|
-| Como o algoritmo decide a comunidade (vizinhos, raio, pesos) | `nucleo/algoritmo.py`, constantes no topo |
-| O texto do aviso de rádio, a regra "inteira/parte" e os fragmentos ("localidades vizinhas") | `nucleo/desligamento.py` (e `montarAviso` em `apresentacao/mapa_template.html`, que tem de gerar o mesmo texto) |
-| Abreviações e prefixos reconhecidos no cadastro | `nucleo/nomes.py` |
-| Tipos e proporções de erro no cadastro fictício | `simulacao/clientes.py` |
-| Tamanho dos transformadores, alimentadores e chaves | `simulacao/rede.py` |
-| Quais arquivos são lidos e gravados, e a ordem das etapas | `pipeline.py` |
-| Métricas de avaliação e teste de robustez | `validacao/avaliacao.py`, `validacao/robustez.py` |
-| Visual e comportamento do mapa, aviso editável e roteiro em PDF | `apresentacao/mapa_template.html` |
-| Dados embutidos no mapa e política de segurança (CSP) | `apresentacao/mapa.py` |
-| Página de entrada com o mapa do Brasil e a área de concessão | `apresentacao/entrada.py` e `entrada_template.html`; contorno em `distribuidoras/concessao/EMG.kml` (`fontes/concessao.py`) |
+| Model | `nucleo/` (regras puras: tradutor da planilha, travas, mensagem, economia, prazo, auditoria, relatórios, algoritmo), `fontes/` (dados reais) e `simulacao/` (dados fictícios); no JavaScript da tela, o objeto `estado` e as regras puras |
+| View | `apresentacao/` (tela do app em `app/`, PDF do roteiro e dos relatórios, e-mail, página de confirmação, mapa estático); no JavaScript, as funções `desenhar*` |
+| Controller | `api/` (rotas FastAPI: planilha, aviso, rádio, relatórios, acesso) e `pipeline.py`; no JavaScript, os eventos |
+| Dados | `banco/` (Postgres + PostGIS: acesso, auditoria, rádios, envios, relatórios, base territorial) |
 
-## Camadas
+O `nucleo/` não lê arquivo nem banco e não conhece o IBGE: recebe dados e devolve resultados, por isso é testado sem servidor.
 
-| Camada | Origem | Fonte |
-|---|---|---|
-| Limite municipal, distritos, setores censitários | Real | IBGE, Malha de Setores 2022 |
-| Localidades oficiais (15) | Real | IBGE, Localidades 2022 |
-| Endereços (30.955, sendo 5.553 rurais) | Real | IBGE, CNEFE 2022 |
-| **Gabarito**: comunidade de cada endereço | Real | CNEFE `DSC_LOCALIDADE`, limpo (65 comunidades rurais e 47 bairros) |
-| Vias | Real | OpenStreetMap |
-| Área de concessão EMG (página de entrada) | Real | KML da Energisa |
-| UFs e municípios da concessão (página de entrada) | Real | IBGE, API de malhas |
-| Subestação, 9 alimentadores, 835 chaves, 2.160 transformadores | Fictícia | Gerada pelas vias reais (`rede.py`) |
-| 29.865 UCs com titular, imóvel e localidade digitada com ruído | Fictícia | `clientes.py` |
+## Segurança e LGPD (resumo)
 
-Ruído simulado no cadastro rural: 22% de localidade vazia, 18% abreviada, 10% com o nome do sítio no lugar da comunidade, 8% com erro de digitação, 5% com a comunidade vizinha, 18% sem coordenada e 4% com coordenada errada.
+A tabela completa "Ameaça → proteção → teste que prova" está em [SEGURANCA.md](SEGURANCA.md).
 
-## Algoritmo (`algoritmo.py`)
+- **Minimização:** a planilha fica só na memória e é descartada. O banco guarda só agregados (municípios, comunidades, contagens, o aviso). Nenhum número de UC, endereço ou coordenada vai para tela, PDF, MP3, e-mail, relatório ou log. Os pontos do mapa ficam só na memória do navegador, sem o número da UC.
+- **Planilha tratada como hostil:** portão por assinatura, limites de zip, sem macro, `defusedxml`, esquema fechado, conta fechada, dupla conferência e erro inesperado sem gerar nada.
+- **Acesso:** Argon2id, senha temporária de uso único, bloqueio por tentativas, cookie HttpOnly/SameSite=Strict, permissão no servidor e isolamento por empresa.
+- **Auditoria:** só inclusão, encadeada por hash, com o nome de quem fez vindo do login. Código de verificação em avisos e relatórios.
+- **Segredos** só em variável de ambiente. Arquivos enviados às rádios ficam cifrados (AES-256-GCM).
+- **Antes de dado real:** MFA no login, revisão LGPD (base legal, contrato de operador, registro das operações, prazo de descarte) e revisão de segurança independente.
 
-Usa **apenas** o que uma distribuidora tem: o cadastro de UCs e a posição dos transformadores. O gabarito do IBGE é lido só em `avaliacao.py`.
+## Validação
 
-1. **Coordenadas**: se a coordenada está ausente ou fica a mais de 600 m do próprio transformador, usa a posição do trafo.
-2. **Texto**: normaliza ("COR. STA CRUZ" → "CORREGO SANTA CRUZ"), remove prefixos ("COMUNIDADE", "PROX.") e descarta campos vazios e nomes de sítio ou fazenda.
-3. **Vocabulário**: agrupa variantes e erros de digitação num nome canônico (fuzzy matching).
-4. **Votação espacial**: cada UC recebe o nome predominante entre as 15 vizinhas mais próximas, num raio de até 1,5 km e com peso pela distância. Vizinhas no mesmo transformador valem 4 vezes mais. Isso corrige localidades vazias, desatualizadas ou com o nome do sítio.
-5. **Homônimos**: o mesmo nome em distritos diferentes vira comunidades distintas, por exemplo "Tomé Nogueira (Tebas)".
-6. **Desligamento** (`desligamento.py`): agrupa as UCs a jusante da chave por comunidade. Se ≥ 90% das UCs da comunidade forem afetadas, ela entra no aviso inteira; caso contrário, como "parte de".
+Última bateria completa (`testes/rodar_testes.ps1`, 14/10/2026): **21 de 21 testes passaram**, com 980 verificações. Entre eles:
 
-## Estrutura
+| Teste | Verificações |
+|---|---|
+| Tela do app no navegador (4 perfis, tema escuro, celular, 44 px, CSP, nada de UC no HTML) | 108 |
+| Coordenadas do tradutor / tradutor (Hypothesis, 50.000 linhas) | 105 / 67 |
+| API / acesso / matriz rota x perfil | 77 / 46 / 5 (46 rotas x 4 perfis) |
+| Rádio, e-mail no Mailpit, confirmação e cofre | 72 |
+| Leitura segura (arquivos maliciosos) / travas e pacote assinado | 51 / 49 |
+| Auditoria encadeada / relatórios e prazo | 45 / 44 |
+| Varredura de minimização (Leopoldina e Muriaé) | 0 ocorrências |
+| Algoritmo (`--so-algoritmo`) | métricas iguais às do passo 12 |
 
-```
-src/comunidades/
-  __init__.py            comando `comunidades` (chama o pipeline)
-  config.py              caminhos e parâmetros globais
-  pipeline.py            orquestração: lê e grava arquivos e chama cada camada
-  fontes/                dados REAIS
-    dados.py             download dos arquivos do IBGE
-    ibge.py              camadas reais + gabarito
-    osm.py               malha viária (OpenStreetMap)
-  simulacao/             dados FICTÍCIOS
-    rede.py              rede elétrica fictícia
-    clientes.py          cadastro fictício de UCs com ruído
-  nucleo/                regras do produto (não lê arquivos nem conhece o IBGE)
-    nomes.py             normalização e grafia dos nomes
-    algoritmo.py         identificação das comunidades e territórios
-    desligamento.py      UCs afetadas por chave e texto do aviso
-  validacao/             métricas (único lugar que lê o gabarito)
-    avaliacao.py         comparação com o gabarito
-    robustez.py          teste de robustez
-  apresentacao/          o que o usuário vê
-    mapa.py              gera o HTML interativo
-    mapa_template.html   mapa, aviso editável e roteiro em PDF
-    vendor/leaflet/      Leaflet 1.9.4 embutido (licença e origem)
-saida/                   mapa, comunidades.gpkg, ucs_comunidade.gpkg, avaliacao_cenarios.csv
-```
+## Próximos passos
 
-## Limitações conhecidas
+- **Mapa estático:** escolher um polígono pronto (comunidade ou distrito) para simular o desligamento e aceitar UTM/GMS na tela de simulação. Ficaram de fora porque o mapa estático tem testes de tela que exigem resultado idêntico ao do passo 12.
+- **Mapa do app:** colorir os pontos das UCs por circuito ou transformador. Hoje a conferência mostra o agrupamento em tabela.
+- **Prazo:** considerar os feriados nos 5 dias úteis. Hoje conta só segunda a sexta.
+- **Antes de dado real:** MFA, revisão LGPD e de segurança, e o modelo oficial de planilha da distribuidora.
+- **Rádio:** confirmação de entrega pelo provedor de e-mail. Hoje "entregue" quer dizer que o servidor de e-mail aceitou a mensagem; a rádio confirma pelo link.
+- **Municípios do usuário:** hoje informam onde a pessoa atua; ainda não limitam o que ela pode gerar.
 
-- O erro restante se concentra nas **fronteiras entre comunidades vizinhas**, onde até o gabarito é incerto, e em UCs cuja localidade digitada é a da comunidade vizinha (51% de acerto nesse caso).
-- A rede elétrica é fictícia: o traçado segue as vias reais, mas não representa a rede real da distribuidora.
-- O gabarito tem pequenas inconsistências de grafia, como "Jardim Caicara" e "Jardim Caicaras". Elas contam como erro na avaliação.
-- Nenhum dado pessoal real é usado: os titulares são fictícios, e o campo do CNEFE que às vezes traz nomes de pessoas foi descartado.
+## Origem dos dados e licenças
 
-## Fontes
-
-- CNEFE 2022: `ftp.ibge.gov.br/Cadastro_Nacional_de_Enderecos_para_Fins_Estatisticos/Censo_Demografico_2022/Arquivos_CNEFE/CSV/Municipio/31_MG/3138401_LEOPOLDINA.zip`
-- Localidades 2022: `geoftp.ibge.gov.br/organizacao_do_territorio/estrutura_territorial/localidades/Localidades_do_Brasil/2022/`
-- Setores 2022: `geoftp.ibge.gov.br/organizacao_do_territorio/malhas_territoriais/malhas_de_setores_censitarios__divisoes_intramunicipais/censo_2022/setores/shp/UF/MG_setores_CD2022.zip`
-- Vias: OpenStreetMap (via OSMnx)
+Fontes (IBGE, OpenStreetMap, Esri, KML da Energisa), componentes (Leaflet, IBM Plex, Piper, Mailpit) e dependências, com licenças e hashes, em [ORIGEM.md](ORIGEM.md).

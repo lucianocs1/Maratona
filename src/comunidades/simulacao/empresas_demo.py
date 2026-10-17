@@ -9,7 +9,7 @@ Usuários só têm o mínimo para dar acesso (LGPD): nome, e-mail corporativo, c
 perfil e municípios. Nada de CPF, data de nascimento, endereço ou telefone pessoal.
 """
 
-CRIADO_POR = "Admin do Farol"
+CRIADO_POR = "Admin do Norte"
 CRIADO_EM = "2026-09-01T12:00:00.000Z"
 
 _PADRAO_EMPRESA = {

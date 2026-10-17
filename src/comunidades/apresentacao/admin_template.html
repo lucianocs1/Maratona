@@ -5,12 +5,12 @@
 <!-- Nenhuma conexão externa (connect-src 'none'); só os scripts embutidos, pelo hash. Calculada pelo admin.py. -->
 <meta http-equiv="Content-Security-Policy" content="/*__CSP__*/">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Farol · Área administrativa (protótipo)</title>
+<title>Norte · Área administrativa (protótipo)</title>
 <link rel="icon" type="image/svg+xml" href="__FAVICON__">
 <!-- IBM Plex Sans e Mono embutidas (SIL OFL 1.1; ver vendor/ibm-plex/) -->
 <style>/*__FONTES__*/</style>
 <style>
-/* ---------- Cores do Farol (claro e escuro, como no mapa) ---------- */
+/* ---------- Cores do Norte (claro e escuro, como no mapa) ---------- */
 :root {
   color-scheme: light;
   --ambar: #F5B83D; --noite: #0E1620; --mare: #1C2A37; --nevoa: #E9EEF3;
@@ -182,7 +182,7 @@ legend { padding: 0; margin-bottom: 8px; }
 <header class="topo">
   <div class="marca">
     <!--__LOGO__-->
-    <div><p class="nome">Farol</p><p class="sub">Área administrativa</p></div>
+    <div><p class="nome">Norte</p><p class="sub">Área administrativa</p></div>
   </div>
   <div class="acoes-topo">
     <span class="sessao" id="sessao"></span>
@@ -345,7 +345,7 @@ function atualizarErros() {
 function telaEntrar() {
   const ui = estado.ui.entrada;
   const opcoes = [
-    ['admin_farol', 'Admin do Farol', 'Cadastra as empresas e os primeiros usuários.'],
+    ['admin_farol', 'Admin do Norte', 'Cadastra as empresas e os primeiros usuários.'],
     ['admin_empresa', 'Admin da empresa', 'Cuida dos usuários e da configuração da própria empresa.'],
     ['operador', 'Operador', 'Usa o mapa; não acessa a administração.'],
     ['consulta', 'Consulta', 'Só consulta o mapa; não acessa a administração.'],
@@ -399,7 +399,7 @@ function linhasEmpresas() {
 function telaEmpresas() {
   return h('section', { 'aria-labelledby': 't-empresas' },
     h('h1', { id: 't-empresas', tabindex: '-1' }, 'Empresas'),
-    h('p', { class: 'apoio' }, 'Distribuidoras, cooperativas e permissionárias que usam o Farol.'),
+    h('p', { class: 'apoio' }, 'Distribuidoras, cooperativas e permissionárias que usam o Norte.'),
     caixaAviso(),
     h('div', { class: 'barra' },
       campo('busca', 'Buscar', entrada('search', estado.ui.busca, { placeholder: 'Nome, CNPJ ou município' })),
@@ -419,7 +419,7 @@ function botoesToml(empresa) {
   if (!empresa.id || !M.pode(estado.sessao, 'gerar_toml', empresa.id)) return null;
   return h('div', { class: 'cartao' },
     h('h2', {}, 'Gerar arquivo de configuração (.toml)'),
-    h('p', { class: 'apoio' }, 'Um arquivo por município, no formato de distribuidoras/*.toml, para rodar o Farol: uv run comunidades --distribuidora arquivo.toml. Usa os dados salvos (salve antes as alterações). Não leva usuários.'),
+    h('p', { class: 'apoio' }, 'Um arquivo por município, no formato de distribuidoras/*.toml, para rodar o Norte: uv run comunidades --distribuidora arquivo.toml. Usa os dados salvos (salve antes as alterações). Não leva usuários.'),
     h('div', { class: 'linha-botoes' }, empresa.municipios.map(m =>
       h('button', { type: 'button', class: 'botao', 'data-acao': 'gerar-toml', 'data-empresa': empresa.id, 'data-municipio': m.codigo }, `Gerar .toml de ${m.nome}`))));
 }
@@ -555,7 +555,7 @@ function telaConfiguracao() {
   const r = estado.ui.rascunho, empresa = empresaPorId(r.id);
   return h('section', { 'aria-labelledby': 't-config' },
     h('h1', { id: 't-config', tabindex: '-1' }, `Configuração · ${empresa.nomeFantasia}`),
-    h('p', { class: 'apoio' }, 'Os dados cadastrais (CNPJ, contato, municípios, domínio) são mantidos pelo Admin do Farol.'),
+    h('p', { class: 'apoio' }, 'Os dados cadastrais (CNPJ, contato, municípios, domínio) são mantidos pelo Admin do Norte.'),
     caixaAviso(),
     h('div', { class: 'cartao' }, h('dl', { class: 'resumo' },
       h('dt', {}, 'CNPJ'), h('dd', { class: 'mono' }, empresa.cnpj),

@@ -32,3 +32,8 @@ saida/muriae/*
 .env
 .env.*
 !.env.exemplo
+
+# Cobertura dos testes (coverage)
+.coverage
+htmlcov/
+node_modules/

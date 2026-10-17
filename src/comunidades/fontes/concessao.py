@@ -10,6 +10,8 @@ Uso: py -m uv run python -m comunidades.fontes.concessao (lista os municípios d
 import gzip
 import json
 import shutil
+import subprocess
+import urllib.error
 import urllib.request
 import xml.etree.ElementTree as ET
 from pathlib import Path
@@ -38,8 +40,16 @@ def _baixar(url: str, destino: Path) -> Path:
     destino.parent.mkdir(parents=True, exist_ok=True)
     print(f"  baixando {destino.name}...", flush=True)
     tmp = destino.with_suffix(".parcial")
-    with urllib.request.urlopen(url, timeout=120) as r, open(tmp, "wb") as f:
-        shutil.copyfileobj(r, f, length=1 << 20)
+    try:
+        with urllib.request.urlopen(url, timeout=120) as r, open(tmp, "wb") as f:
+            shutil.copyfileobj(r, f, length=1 << 20)
+    except urllib.error.URLError as e:
+        # o Python não reconhece a cadeia de certificados do IBGE em algumas máquinas: o curl do sistema (que usa os
+        # certificados do Windows) baixa com a verificação ligada; nunca se desliga a verificação
+        curl = shutil.which("curl")
+        if not curl or "CERTIFICATE" not in str(e).upper():
+            raise
+        subprocess.run([curl, "-sS", "--fail", "--compressed", "--max-time", "300", "-o", str(tmp), url], check=True)
     bruto = tmp.read_bytes()
     if bruto[:2] == b"\x1f\x8b":
         tmp.write_bytes(gzip.decompress(bruto))

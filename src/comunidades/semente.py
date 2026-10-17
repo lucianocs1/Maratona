@@ -12,13 +12,14 @@ Uso:
 
 import sys
 
-from .api.acesso import hash_senha, senha_temporaria
+from .senhas import hash_senha, senha_temporaria
 from .banco import acesso as banco
+from .banco.conexao import conectar
 from .nucleo.acesso import PERFIS
 
 EMPRESA = {"nome": "Distribuidora EMG (demonstração)", "sigla": "EMG", "dominio": "emg.example"}
 USUARIOS = [  # (perfil, e-mail, nome)
-    ("admin_farol", "admin@farol.example", "Admin do Farol"),
+    ("admin_farol", "admin@farol.example", "Admin do Norte"),
     ("admin_empresa", "admin@emg.example", "Admin da EMG"),
     ("operador", "operador@emg.example", "Operador da EMG"),
     ("consulta", "consulta@emg.example", "Consulta da EMG"),
@@ -41,7 +42,19 @@ def semear() -> list[tuple[str, str, str]]:
         banco.criar_usuario(empresa_id, email, nome, perfil, hash_senha(temporaria), trocar_senha=True)
         banco.registrar("semente: criou usuário", f"{nome} ({PERFIS[perfil]})", None, empresa_id)
         criados.append((perfil, email, temporaria))
+    semear_area_demo()
     return criados
+
+
+def semear_area_demo() -> bool:
+    """A EMG de demonstração recebe, uma vez só, a área que já existia: os municípios da base territorial (a concessão
+    carregada pelo base_concessao). Roda na semente e ao subir a API (banco que já existia antes da área de atuação)."""
+    try:
+        with conectar() as c:
+            codigos = [r[0] for r in c.execute("SELECT codigo_ibge FROM municipio").fetchall()]
+    except Exception:   # sem base territorial carregada: nada a semear
+        return False
+    return banco.semear_area_inicial(EMPRESA["sigla"], codigos)
 
 
 def nova_senha(email: str) -> str:

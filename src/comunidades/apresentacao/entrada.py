@@ -1,8 +1,8 @@
-"""Página de entrada do Farol (saida/index.html): abertura, o mapa do Brasil e a escolha da área.
+"""Página de entrada do Norte (saida/index.html): abertura, o mapa do Brasil e a escolha da área.
 
 Lista os municípios já processados, lendo os resumo_mapa.json que cada mapa grava ao lado
 (só nome, UF, código IBGE e contagens). O mapa (Leaflet embutido) mostra as UFs, o contorno da
-área de concessão e os municípios dentro dela: os já processados abrem o mapa do Farol, os outros
+área de concessão e os municípios dentro dela: os já processados abrem o mapa do Norte, os outros
 aparecem como "ainda não processado". Os links são relativos, para funcionar aberta como arquivo,
 sem servidor. O script é liberado pelo hash na CSP, como no mapa, e os cartões continuam abaixo
 do mapa (funcionam também sem script).
@@ -91,7 +91,7 @@ def dados_mapa(ms: list[dict]) -> dict:
 def construir() -> Path:
     ms = municipios()
     cartoes = (f'<ul class="cartoes">{"".join(_cartao(m) for m in ms)}\n    </ul>' if ms
-               else '<p class="vazio">Nenhuma área gerada ainda. Rode o Farol para um município.</p>')
+               else '<p class="vazio">Nenhuma área gerada ainda. Rode o Norte para um município.</p>')
     try:
         dados = dados_mapa(ms)
     except (OSError, ValueError) as e:  # sem internet na primeira vez ou KML inválido: entrada só com os cartões

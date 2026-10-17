@@ -5,7 +5,7 @@
 <!-- Só imagens de fundo de mapa da Esri (e imagens/fontes embutidas data:); nenhuma outra conexão externa. Os hashes dos scripts são calculados pelo mapa.py. -->
 <meta http-equiv="Content-Security-Policy" content="/*__CSP__*/">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Farol · Leopoldina</title>
+<title>Norte · Leopoldina</title>
 <link rel="icon" type="image/svg+xml" href="__FAVICON__">
 <!-- Tela de abertura: o estilo vem antes de tudo, para ela aparecer antes do carregamento pesado -->
 <style>
@@ -33,7 +33,7 @@
 <!-- IBM Plex Sans e Mono embutidas (SIL OFL 1.1; ver vendor/ibm-plex/) -->
 <style>/*__FONTES__*/</style>
 <style>
-/* ---------- Cores do Farol ---------- */
+/* ---------- Cores do Norte ---------- */
 :root {
   color-scheme: light;
   --ambar: #F5B83D; --noite: #0E1620; --mare: #1C2A37; --nevoa: #E9EEF3;
@@ -362,13 +362,13 @@ button.sw[aria-checked="true"] .chave-sw::after { left: 19px; background: var(--
 <body>
 <div id="abertura" class="abertura" role="status" aria-live="polite">
   <div class="abertura-logo" aria-hidden="true"><!--__LOGO_ABERTURA__--></div>
-  <p class="abertura-nome">Farol</p>
-  <p class="abertura-slogan">Cada comunidade avisada pelo nome</p>
+  <p class="abertura-nome">Norte</p>
+  <p class="abertura-slogan">O aviso certo, para a comunidade certa</p>
   <p class="abertura-progresso" id="aberturaProgresso">Carregando o território…</p>
   <p class="abertura-nota">Rede elétrica e clientes fictícios · território real (IBGE Censo 2022)</p>
 </div>
 <header class="topo">
-  <div class="marca"><!--__LOGO__--><div><div class="nome" id="appNome">Farol</div><div class="lugar" id="appLugar"></div></div>
+  <div class="marca"><!--__LOGO__--><div><div class="nome" id="appNome">Norte</div><div class="lugar" id="appLugar"></div></div>
     <a class="trocar" id="btnTrocarArea" href="__ENTRADA__" title="Voltar à escolha da área"><span class="longo">Trocar área</span><span class="curto">Trocar</span></a></div>
   <div class="busca">
     <svg class="lupa" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg>
@@ -399,7 +399,7 @@ button.sw[aria-checked="true"] .chave-sw::after { left: 19px; background: var(--
         <button role="radio" aria-checked="false" data-modo="obra">Por ponto da obra</button>
         <button role="radio" aria-checked="false" data-modo="area">Por área</button>
       </div>
-      <p id="instrObra" class="nota oculto" style="margin:0">Clique com o botão direito no mapa, no lugar da obra, ou digite a coordenada na busca (ex.: -21.5392, -42.6411). O Farol mostra as chaves que desligam o trecho, da que deixa menos clientes sem luz para a que deixa mais.</p>
+      <p id="instrObra" class="nota oculto" style="margin:0">Clique com o botão direito no mapa, no lugar da obra, ou digite a coordenada na busca (ex.: -21.5392, -42.6411). O Norte mostra as chaves que desligam o trecho, da que deixa menos clientes sem luz para a que deixa mais.</p>
       <div id="blocoArea" class="area-bloco oculto">
         <p class="area-alerta">A área não segue a rede elétrica. Confira com a equipe se ela corresponde ao trecho que será desligado.</p>
         <div class="linha-botoes" id="areaBotoes"><button id="btnDesenhar">Desenhar área</button><button id="btnImportar">Importar contorno</button></div>
@@ -473,7 +473,7 @@ button.sw[aria-checked="true"] .chave-sw::after { left: 19px; background: var(--
       <div class="cmp" id="blocoComparacao">
         <div class="cmp-l"><span>Hoje (fazenda a fazenda)</span><b id="tAntigo"></b></div>
         <div class="trilho"><i id="barraAntigo"></i></div>
-        <div class="cmp-l"><span>Farol (por comunidade)</span><b id="tNovo"></b></div>
+        <div class="cmp-l"><span>Norte (por comunidade)</span><b id="tNovo"></b></div>
         <div class="trilho"><i id="barraNovo"></i></div>
         <p class="ganho" id="ganho"></p>
       </div>
@@ -522,8 +522,8 @@ const D = /*__DADOS__*/null;
 // Não toca no HTML nem no mapa: recebe valores e devolve valores. As regras repetem as do
 // Python (nucleo/), e os testes de testes/navegador conferem que dão o mesmo resultado.
 // =====================================================================================
-const APP_NOME = 'Farol';
-const SLOGAN = 'Cada comunidade avisada pelo nome.';
+const APP_NOME = 'Norte';
+const SLOGAN = 'O aviso certo, para a comunidade certa.';
 // Prazo legal de aviso para as demais unidades: 72 horas (REN ANEEL 1.000/2021, art. 436)
 const DIST = D.distribuidora;  // configuração da distribuidora (distribuidoras/*.toml)
 const PRAZO_LEGAL_HORAS = DIST.prazoLegalHoras;
@@ -574,7 +574,7 @@ const estado = {
   data: isoData(new Date(Date.now() + (PRAZO_INTERNO_DIAS + 1) * 864e5)),  // sugestão: dentro do prazo interno
   ini: '08:00', fim: '14:00', tel: DIST.telefone,
   idioma: DIST.idiomaPadrao in IDI ? DIST.idiomaPadrao : D.idiomas.padrao,  // só o aviso e o roteiro
-  textos: { antigo: '', novo: '' },  // aviso de hoje e aviso do Farol, como estão na tela
+  textos: { antigo: '', novo: '' },  // aviso de hoje e aviso do Norte, como estão na tela
   lendo: null,              // aviso sendo lido em voz alta ('novo' ou 'antigo')
   busca: { opcoes: [], ativa: -1, ponto: null },  // sugestões da busca e a escolhida pelo teclado
 };
@@ -980,7 +980,7 @@ function problemaDoArquivo(tamanho) {
 // Mensagem de quando a área não serve (null: serve)
 function problemaDaArea(r, polis) {
   if (r.situacao === 'vertices') return `O contorno tem ${fmt(nVertices(polis))} vértices; o limite é ${fmt(CFG_AREA.maxVertices)}. Simplifique o contorno e importe de novo.`;
-  if (r.situacao === 'fora') return `A área fica fora de ${DIST.municipio}, o município carregado neste mapa. Para outro município, gere o Farol daquele município.`;
+  if (r.situacao === 'fora') return `A área fica fora de ${DIST.municipio}, o município carregado neste mapa. Para outro município, gere o Norte daquele município.`;
   if (r.situacao === 'sem_clientes') return 'Nenhum cliente dentro da área. Confira se o contorno cobre o trecho que será desligado.';
   return null;
 }
@@ -1292,7 +1292,7 @@ function mostrarTextosFixos() {
   <div class="valid-nums">
     <div><div class="num">${pct(M.acertoRural)}<small>%</small></div><div class="leg">acerto da comunidade (UCs rurais) <span class="de">· cadastro ${pct(M.acertoRuralCadastro)}%</span></div></div>
     <div><div class="num">${pct(M.coberturaUC)}<small>%</small></div><div class="leg">dos clientes desligados ouvem o nome da própria comunidade</div></div>
-    <div><div class="num">${M.segDepois}<small> s</small></div><div class="leg">aviso médio no Farol <span class="de">· hoje ${M.segAntes} s</span></div></div>
+    <div><div class="num">${M.segDepois}<small> s</small></div><div class="leg">aviso médio no Norte <span class="de">· hoje ${M.segAntes} s</span></div></div>
   </div>`;
   $('appLugar').textContent = `${DIST.municipio}/${DIST.uf} · demonstração`;
   $('notaPrazos').textContent = `Unidades com equipamento vital exigem ${PRAZO_VITAL_DIAS_UTEIS} dias úteis (não há cadastro desses clientes nesta demonstração). Prazos: ${DIST.norma}.`;
@@ -1450,12 +1450,12 @@ function desenharAviso() {
   if (c.area) {
     const { inteiras, parciais } = classificar(c), k = inteiras.length + parciais.length;
     rotAntigo.textContent = `Hoje: ${fmt(textos.hoje.locais)} ${textos.hoje.locais === 1 ? 'local citado' : 'locais citados'} · ${fmt(textos.hoje.palavras)} palavras`;
-    rotNovo.textContent = `Farol: ${fmt(k)} ${k === 1 ? 'comunidade' : 'comunidades'} · ${fmt(palavras(textos.novo))} palavras`;
+    rotNovo.textContent = `Norte: ${fmt(k)} ${k === 1 ? 'comunidade' : 'comunidades'} · ${fmt(palavras(textos.novo))} palavras`;
     $('tAntigo').textContent = `${tempo(sA)} no ar`; $('tNovo').textContent = `${tempo(sD)} no ar`;
   } else {
     $('avisoAntigo').textContent = textos.antigo;
     $('resumoAntigo').textContent = `Ver o aviso de hoje (fazenda a fazenda, ${fmt(palavras(textos.antigo))} palavras)`;
-    rotAntigo.textContent = 'Hoje (fazenda a fazenda)'; rotNovo.textContent = 'Farol (por comunidade)';
+    rotAntigo.textContent = 'Hoje (fazenda a fazenda)'; rotNovo.textContent = 'Norte (por comunidade)';
     $('tAntigo').textContent = tempo(sA); $('tNovo').textContent = tempo(sD);
   }
   $('barraAntigo').style.width = '100%';
@@ -1493,7 +1493,7 @@ const RT = {
     verif: 'Código de verificação: qualquer alteração no texto gera um código diferente.',
   },
   en: {
-    slogan: 'Every community warned by name.', titulo: 'Scheduled power outage notice', avisoN: 'Notice no.',
+    slogan: 'The right notice, for the right community.', titulo: 'Scheduled power outage notice', avisoN: 'Notice no.',
     gerado: (a, m, d, h) => `generated on ${MESES_EN[+m - 1]} ${+d}, ${a} at ${h}`,
     leitura: 'Script to read on air', duracao: s => `Estimated duration: about ${s} seconds (read at ~150 words per minute).`,
     resumo: 'Summary', data: 'Date', dataLonga: (a, m, d) => `${MESES_EN[+m - 1]} ${+d}, ${a}`, semData: '(no date)',
@@ -1513,7 +1513,7 @@ const RT = {
     verif: 'Verification code: any change to the text produces a different code.',
   },
   es: {
-    slogan: 'Cada comunidad avisada por su nombre.', titulo: 'Aviso de corte programado', avisoN: 'Aviso n.º',
+    slogan: 'El aviso correcto, para la comunidad correcta.', titulo: 'Aviso de corte programado', avisoN: 'Aviso n.º',
     gerado: (a, m, d, h) => `generado el ${d}/${m}/${a} a las ${h}`,
     leitura: 'Texto para leer al aire', duracao: s => `Duración estimada: unos ${s} segundos (locución de ~150 palabras por minuto).`,
     resumo: 'Resumen', data: 'Fecha', dataLonga: (a, m, d) => `${d}/${m}/${a}`, semData: '(sin fecha)',
@@ -1634,7 +1634,7 @@ function desenharObra(o) {
     : `${coord}<br>Comunidade: <b>${esc(o.comunidade || 'fora das comunidades identificadas')}</b> · distrito <b>${esc(o.distrito || '—')}</b>`
       + (o.situacao !== 'longe' ? `<br>Média tensão mais próxima: alimentador <b class="inteiro">${esc(o.alim)}</b>, a <b class="inteiro">${fmt(Math.round(o.distancia_m))} m</b>` : '');
   let msg;
-  if (fora) msg = 'Este ponto fica fora da área carregada. Gere o Farol para esse município.';
+  if (fora) msg = 'Este ponto fica fora da área carregada. Gere o Norte para esse município.';
   else if (o.situacao === 'longe') msg = `Não há rede de média tensão a menos de ${fmt(RAIO_REDE_M)} m deste ponto.`;
   else if (o.situacao === 'tronco') msg = `Nenhuma chave de ramal isola este trecho: ele fica no tronco do alimentador ${o.alim}, perto da subestação. `
     + `Desligar o alimentador inteiro deixaria ${fmt(REDE.clientesPorAlimentador[o.alim] || 0)} clientes sem luz. Avalie trabalho com a rede energizada (linha viva) ou gerador.`;

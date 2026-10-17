@@ -64,8 +64,21 @@ def pronto(email):
     return c
 
 
+def importar(c):
+    """1º passo (Conferir): a planilha vira a conferência com o pacote assinado."""
+    return c.post("/api/planilha", files={"arquivo": ("p.csv", planilha)}, data={"data": "12/11", "horario": "8h às 14h"})
+
+
 def gerar(c):
-    return c.post("/api/avisos", files={"arquivo": ("p.csv", planilha)}, data={"data": "12/11", "horario": "8h às 14h"})
+    """Os dois passos: conferir e gerar com o pacote e a caixa "Conferi" marcada."""
+    r = importar(c)
+    if r.status_code != 200:
+        return r
+    return c.post("/api/avisos", json={"pacote": r.json()["pacote"], "data": "12/11", "horario": "8h às 14h", "conferi": True})
+
+
+def baixar_json(c):
+    return c.post("/api/planilha/json", files={"arquivo": ("p.csv", planilha)})
 
 
 # ---------- 1. Sem login ----------
@@ -73,7 +86,10 @@ anon = cliente()
 conferir("sem login: /api/saude responde", anon.get("/api/saude").status_code == 200)
 fechadas = {"GET /api/config": anon.get("/api/config"), "GET /api/concessao": anon.get("/api/concessao"),
             "GET /api/historico": anon.get("/api/historico"), "GET /api/painel": anon.get("/api/painel"), "GET /api/usuarios": anon.get("/api/usuarios"),
-            "POST /api/avisos": gerar(anon), "GET /api/modelo-planilha": anon.get("/api/modelo-planilha")}
+            "POST /api/avisos": anon.post("/api/avisos", json={"pacote": "x", "data": "1", "horario": "1"}),
+            "POST /api/planilha": importar(anon), "POST /api/planilha/json": baixar_json(anon),
+            "POST /api/planilha/relatorio": anon.post("/api/planilha/relatorio", json={"pacote": "x"}),
+            "GET /api/modelo-planilha": anon.get("/api/modelo-planilha")}
 conferir("sem login: todas as outras rotas respondem 401", all(r.status_code == 401 for r in fechadas.values()),
          str({k: r.status_code for k, r in fechadas.items()}))
 
@@ -99,11 +115,12 @@ conferir("troca de senha válida libera a tela", r.status_code == 200 and op.get
 clientes = {"operador": op, "admin_empresa": pronto("admin@emg.example"), "consulta": pronto("consulta@emg.example"),
             "admin_farol": pronto("admin@farol.example")}
 esperado = {  # rota -> perfis que podem
-    "gerar aviso": {"admin_empresa", "operador"}, "histórico": {"admin_empresa", "operador", "consulta"},
+    "gerar aviso": {"admin_empresa", "operador"}, "conferir planilha": {"admin_empresa", "operador"},
+    "baixar JSON com UCs": {"admin_empresa", "operador"}, "histórico": {"admin_empresa", "operador", "consulta"},
     "dashboard": {"admin_empresa", "operador", "consulta"},
     "usuários": {"admin_empresa"}, "empresas": {"admin_farol"}, "registro": {"admin_farol", "admin_empresa"},
 }
-rotas = {"gerar aviso": gerar, "histórico": lambda c: c.get("/api/historico"), "dashboard": lambda c: c.get("/api/painel"), "usuários": lambda c: c.get("/api/usuarios"),
+rotas = {"gerar aviso": gerar, "conferir planilha": importar, "baixar JSON com UCs": baixar_json, "histórico": lambda c: c.get("/api/historico"), "dashboard": lambda c: c.get("/api/painel"), "usuários": lambda c: c.get("/api/usuarios"),
          "empresas": lambda c: c.get("/api/empresas"), "registro": lambda c: c.get("/api/registro")}
 erros = []
 for rota, f in rotas.items():
@@ -145,12 +162,12 @@ conferir("bloquear usuário encerra a sessão dele", r.status_code == 200 and no
 _, r = entrar("novo@emg.example", temp_novo)
 conferir("usuário bloqueado não entra (403)", r.status_code == 403, r.text[:100])
 
-# ---------- 6. Admin do Farol: empresas e isolamento ----------
+# ---------- 6. Admin do Norte: empresas e isolamento ----------
 far = clientes["admin_farol"]
 r = far.post("/api/empresas", json={"nome": "Cooperativa Teste", "sigla": "CTE", "dominio": "cte.example",
                                     "admin_nome": "Admin CTE", "admin_email": "admin@cte.example"})
 temp_cte = r.json().get("senha_temporaria", "")
-conferir("Admin do Farol cadastra empresa com o primeiro admin", r.status_code == 200 and temp_cte, r.text[:120])
+conferir("Admin do Norte cadastra empresa com o primeiro admin", r.status_code == 200 and temp_cte, r.text[:120])
 cte, _ = entrar("admin@cte.example", temp_cte)
 cte.post("/api/senha", json={"atual": temp_cte, "nova": NOVA})
 conferir("outra empresa não vê o histórico da EMG", cte.get("/api/historico").json()["avisos"] == [])
@@ -159,14 +176,24 @@ conferir("outra empresa não abre aviso da EMG (404)", cte.get(f"/api/historico/
 conferir("outra empresa: dashboard vazio (não vê os avisos da EMG)", cte.get("/api/painel").json()["totais"]["avisos"] == 0)
 reg_far = far.get("/api/registro").json()["registro"]
 reg_adm = adm.get("/api/registro").json()["registro"]
-conferir("registro: Admin do Farol vê tudo; Admin da empresa só a dele",
+conferir("registro: Admin do Norte vê tudo; Admin da empresa só a dele",
          any(x["empresa"] == "CTE" for x in reg_far) and all(x["empresa"] in ("EMG", None) for x in reg_adm) and any(x["acao"] == "gerou aviso" for x in reg_adm))
 
 # ---------- 7. Bloqueio, sessão e origem ----------
 for _ in range(5):
     entrar("consulta@emg.example", "senha-errada-xyz")
 _, r = entrar("consulta@emg.example", NOVA)
-conferir("5 senhas erradas bloqueiam a conta (mesmo com a senha certa depois: 423)", r.status_code == 423, r.text[:100])
+conferir("5 senhas erradas bloqueiam a conta (mesmo com a senha certa depois)", r.status_code == 401, r.text[:100])
+_, desconhecido = entrar("ninguem@emg.example", NOVA)
+_, errada = entrar("consulta@emg.example", "senha-errada-xyz")
+conferir("conta bloqueada responde igual a e-mail desconhecido e a senha errada (status e texto)",
+         r.status_code == desconhecido.status_code == errada.status_code == 401
+         and r.json() == desconhecido.json() == errada.json() == {"detail": api_acesso.ERRO_LOGIN},
+         f"{r.status_code} {r.text[:80]} | {desconhecido.status_code} {desconhecido.text[:80]}")
+conferir("a mensagem genérica avisa da suspensão por 15 minutos",
+         "Após 5 tentativas erradas o acesso fica suspenso por 15 minutos" in r.json().get("detail", ""), r.text[:120])
+conferir("o bloqueio fica no registro interno", any("bloqueio temporário" in x[0] for x in
+         sql("SELECT acao FROM registro ORDER BY id DESC LIMIT 5")), "")
 sql("UPDATE usuario SET bloqueado_ate = NULL WHERE email = 'consulta@emg.example'")
 c, _ = entrar("consulta@emg.example", NOVA)
 c.post("/api/sair")
@@ -178,9 +205,44 @@ c = cliente()
 r = c.post("/api/entrar", json={"email": "operador@emg.example", "senha": NOVA}, headers={"Origin": "https://malicioso.example"})
 conferir("login vindo de outra origem é recusado (403)", r.status_code == 403, r.text[:80])
 c, _ = entrar("operador@emg.example", NOVA)
-r = c.post("/api/avisos", files={"arquivo": ("p.csv", planilha)}, data={"data": "12/11", "horario": "8h"},
+r = c.post("/api/planilha", files={"arquivo": ("p.csv", planilha)}, data={"data": "12/11", "horario": "8h"},
            headers={"Origin": "https://malicioso.example"})
 conferir("envio de planilha de outra origem é recusado (403)", r.status_code == 403, r.text[:80])
+
+# ---------- 7b. Fase E: municípios do usuário, CNPJ e suspensão da empresa ----------
+from comunidades.nucleo.acesso import cnpj_valido  # noqa: E402
+
+conferir("CNPJ: numérico e alfanumérico (exemplo da Receita) válidos; dígito errado e repetido inválidos",
+         cnpj_valido("11.222.333/0001-81") and cnpj_valido("12.ABC.345/01DE-35") and not cnpj_valido("11.222.333/0001-82")
+         and not cnpj_valido("00.000.000/0000-00") and not cnpj_valido("abc"))
+adm, _ = entrar("admin@emg.example", NOVA)   # a seção 7 venceu as sessões abertas
+far, _ = entrar("admin@farol.example", NOVA)
+cte, _ = entrar("admin@cte.example", NOVA)
+r = adm.post("/api/usuarios", json={"nome": "Operadora Leopoldina", "email": "leo@emg.example", "perfil": "operador", "municipios": ["3138401"]})
+conferir("usuário com os municípios em que atua", r.status_code == 200 and r.json()["usuario"]["municipios"] == ["3138401"], r.text[:120])
+uid = r.json()["usuario"]["id"]
+r = adm.patch(f"/api/usuarios/{uid}", json={"perfil": "consulta", "status": "ativo", "municipios": ["3138401", "3115300"]})
+conferir("alterar os municípios do usuário (e o perfil)", r.status_code == 200 and r.json()["usuario"]["municipios"] == ["3115300", "3138401"]
+         and r.json()["usuario"]["perfil"] == "consulta", r.text[:120])
+conferir("município fora da concessão: 422", adm.post("/api/usuarios", json={"nome": "Fora", "email": "fora@emg.example", "perfil": "operador",
+                                                                         "municipios": ["3550308"]}).status_code == 422)
+r = far.post("/api/empresas", json={"nome": "Cooperativa CNPJ", "sigla": "CCJ", "dominio": "ccj.example", "admin_nome": "Admin CCJ",
+                                    "admin_email": "admin@ccj.example", "cnpj": "12.ABC.345/01DE-35"})
+conferir("empresa com CNPJ alfanumérico: cadastrada e listada formatada", r.status_code == 200
+         and any(e["cnpj"] == "12.ABC.345/01DE-35" for e in far.get("/api/empresas").json()["empresas"]), r.text[:120])
+conferir("CNPJ inválido ou repetido: 422 / 409", far.post("/api/empresas", json={"nome": "Empresa X", "sigla": "XX", "dominio": "xx.example",
+                                                       "admin_nome": "Admin X", "admin_email": "a@xx.example", "cnpj": "11.222.333/0001-82"}).status_code == 422
+         and far.post("/api/empresas", json={"nome": "Empresa Y", "sigla": "YY", "dominio": "yy.example", "admin_nome": "Admin Y",
+                                             "admin_email": "a@yy.example", "cnpj": "12ABC34501DE35"}).status_code == 409)
+cte_id = next(e["id"] for e in far.get("/api/empresas").json()["empresas"] if e["sigla"] == "CTE")
+r = far.patch(f"/api/empresas/{cte_id}", json={"status": "suspensa"})
+conferir("suspender empresa: a sessão aberta do admin dela acaba e o login é recusado (403)", r.status_code == 200
+         and cte.get("/api/eu").status_code == 401 and entrar("admin@cte.example", NOVA)[1].status_code == 403)
+far.patch(f"/api/empresas/{cte_id}", json={"status": "ativa"})
+conferir("reativar empresa: o admin dela entra de novo", entrar("admin@cte.example", NOVA)[1].status_code == 200)
+conferir("suspender e reativar ficam na auditoria", {"suspendeu empresa", "reativou empresa"}
+         <= {x["acao"] for x in far.get("/api/registro").json()["registro"]})
+conferir("Admin da empresa não suspende empresa (403)", adm.patch(f"/api/empresas/{cte_id}", json={"status": "suspensa"}).status_code == 403)
 
 # ---------- 8. Semente e o que fica no banco ----------
 antes = sql("SELECT count(*) FROM usuario")[0][0]

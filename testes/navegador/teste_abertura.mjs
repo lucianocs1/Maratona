@@ -117,7 +117,7 @@ for (const [largura, altura, nome] of [[1440, 900, 'computador'], [390, 844, 'ce
     conferir('entrada: pergunta "Qual área você quer abrir?"', info.pergunta === 'Qual área você quer abrir?');
     conferir('entrada: só scripts embutidos, liberados pelo hash na CSP, e nenhuma conexão', info.scripts === 2 && !info.externos
       && /script-src 'sha256-[^']+' 'sha256-[^']+';/.test(info.csp) && info.csp.includes("connect-src 'none'"), info.csp.replace(/'sha256-[^']+'/g, "'sha256-…'"));
-    conferir('entrada: nota de dados fictícios e de como gerar outro município', /fictícios/.test(info.nota) && info.nota.includes('Para outro município, gere o Farol pelo comando com --coordenada ou --distribuidora.'), info.nota);
+    conferir('entrada: nota de dados fictícios e de como gerar outro município', /fictícios/.test(info.nota) && info.nota.includes('Para outro município, gere o Norte pelo comando com --coordenada ou --distribuidora.'), info.nota);
     conferir('entrada: abertura só com CSS, terminando em cerca de 1,2 s', info.fim >= 1000 && info.fim <= 1500, `${Math.round(info.fim)} ms`);
     conferir('entrada: mapa do Brasil com as 27 UFs, a concessão e os 66 municípios', info.mapa.visivel && info.mapa.ufs === 27 && info.mapa.municipios === 66 && info.mapa.contagem === '66 / 2', JSON.stringify(info.mapa));
     conferir('entrada: Leopoldina e Muriaé marcados como prontos, com o link do mapa', info.mapa.prontos === 'Leopoldina|mapa_comunidades.html, Muriaé|muriae/mapa_comunidades.html', info.mapa.prontos);

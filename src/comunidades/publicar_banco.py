@@ -17,12 +17,13 @@ import time
 import psycopg
 
 from . import config as C
-from .banco import base_territorial, rede
+from .banco import base_territorial, municipios_ibge, rede
 from .banco.conexao import conectar
 
 ARQ = C.RAIZ / ".env.producao"
 TABELAS = ("municipio", "comunidade", "endereco_referencia",
-           "rede_subestacao", "rede_trecho", "rede_chave", "rede_trafo")   # na ordem das chaves estrangeiras
+           "rede_subestacao", "rede_trecho", "rede_chave", "rede_trafo",   # na ordem das chaves estrangeiras
+           "municipio_ibge")   # os municípios do Brasil (malha do IBGE), para a área de atuação das empresas
 
 
 def destino() -> str:
@@ -52,6 +53,7 @@ def publicar() -> int:
             print(f"Destino: banco {banco} ({versao.split(',')[0]})", flush=True)
             cur.execute(base_territorial.ESQUEMA)   # inclui CREATE EXTENSION postgis
             cur.execute(rede.ESQUEMA)
+            cur.execute(municipios_ibge.ESQUEMA)
             cur.execute("TRUNCATE " + ", ".join(TABELAS))
         for t in TABELAS:
             with origem.cursor() as co, dst.cursor() as cd:

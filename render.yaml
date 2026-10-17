@@ -17,3 +17,19 @@ services:
         value: "1"
       - key: FAROL_AUDIO          # sem a voz: o plano gratuito tem 512 MB e a voz pede ~520 MB a mais
         value: "0"
+      - key: FAROL_CHAVE_PACOTE   # HMAC do pacote da conferência da planilha (o Render gera; nunca no git)
+        generateValue: true
+      - key: FAROL_CHAVE_ARQUIVOS # AES-256-GCM dos PDF e MP3 enviados às rádios (o Render gera; nunca no git)
+        generateValue: true
+      - key: FAROL_URL_PUBLICA    # endereço público do Farol (o link "Confirmar recebimento" do e-mail)
+        sync: false
+      - key: FAROL_SMTP_HOST      # servidor de e-mail; sem ele, o envio por e-mail fica desligado
+        sync: false
+      - key: FAROL_SMTP_PORTA
+        sync: false
+      - key: FAROL_SMTP_USUARIO
+        sync: false
+      - key: FAROL_SMTP_SENHA     # segredo: só no painel do Render
+        sync: false
+      - key: FAROL_SMTP_REMETENTE
+        sync: false

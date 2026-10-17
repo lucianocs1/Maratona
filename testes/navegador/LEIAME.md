@@ -82,3 +82,7 @@ Cada teste termina com código 0 quando está tudo certo e 1 quando há diferen�
 - todas as verificações OK no teste de abertura;
 - "Nenhum alvo de toque abaixo de 44 px" na varredura;
 - "169 de 169 verificações OK" no teste da área administrativa e "182 de 182" no teste do Model.
+
+## Problemas comuns
+
+- Muriaé depende do OSM do dia: o repositório tem 1.361 chaves (gerado pelo Lucas); refazendo localmente pode dar 1.364. As duas são válidas; as métricas principais não mudam.

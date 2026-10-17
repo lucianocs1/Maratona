@@ -1,0 +1,14 @@
+{
+  "name": "Norte · Aviso de desligamento",
+  "short_name": "Norte",
+  "description": "O aviso certo, para a comunidade certa. Sem service worker: nada da API fica guardado no aparelho.",
+  "lang": "pt-BR",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#0E1620",
+  "theme_color": "#0E1620",
+  "icons": [
+    { "src": "/assets/marca/farol.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+  ]
+}

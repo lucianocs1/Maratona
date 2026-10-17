@@ -8,20 +8,13 @@ import os
 
 import psycopg
 
-from .. import config as C
-
-# FAROL_ENV escolhe outro arquivo (ex.: .env.producao, para a semente no banco de produção)
-ARQ_ENV = C.RAIZ / (os.environ.get("FAROL_ENV") or ".env")
+from ..segredos import ARQ_ENV, segredo  # noqa: F401 (ARQ_ENV: FAROL_ENV escolhe outro arquivo, ex.: .env.producao)
 
 
 def url() -> str:
-    if os.environ.get("DATABASE_URL"):
-        return os.environ["DATABASE_URL"]
-    if ARQ_ENV.exists():
-        for linha in ARQ_ENV.read_text(encoding="utf-8").splitlines():
-            nome, _, valor = linha.strip().partition("=")
-            if nome.strip() == "DATABASE_URL" and valor.strip():
-                return valor.strip().strip('"').strip("'")
+    u = segredo("DATABASE_URL")
+    if u:
+        return u
     raise RuntimeError("DATABASE_URL não definida (variável de ambiente ou .env na raiz do projeto)")
 
 

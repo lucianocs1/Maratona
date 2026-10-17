@@ -1,0 +1,8 @@
+{
+  "name": "farol-testes-navegador",
+  "private": true,
+  "description": "Só para os testes do navegador (Fase I5): axe-core, versão fixada. Nada daqui vai para a tela nem para o servidor.",
+  "devDependencies": {
+    "axe-core": "4.10.2"
+  }
+}

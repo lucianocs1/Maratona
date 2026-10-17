@@ -64,17 +64,20 @@ def resumir(avisos: list[dict], hoje: date, spot_segundos: int = SPOT_SEGUNDOS) 
             mun_ucs[cod] += int(m.get("ucs", 0))
             cartoes += 1
             finais += bool(m.get("texto_final"))
-            if m.get("segundos") is not None:
-                segundos_soma += float(m["segundos"])
+            # o tempo no ar do que vai à rádio: a mensagem pelo modelo da empresa, se houver; senão o aviso do algoritmo
+            seg_farol = m.get("segundos_mensagem") if m.get("segundos_mensagem") is not None else m.get("segundos")
+            texto_farol = m.get("mensagem") or m.get("aviso", "")
+            if seg_farol is not None:
+                segundos_soma += float(seg_farol)
                 segundos_n += 1
             if m.get("hoje"):   # o comparativo: só os municípios cuja planilha trouxe a coluna local
                 comp["municipios"] += 1
                 comp["segundos_hoje"] += int(m["hoje"]["segundos"])
-                comp["segundos_farol"] += int(m.get("segundos") or 0)
+                comp["segundos_farol"] += int(seg_farol or 0)
                 comp["spots_hoje"] += spots(int(m["hoje"]["segundos"]), spot_segundos)
-                comp["spots_farol"] += spots(int(m.get("segundos") or 0), spot_segundos)
+                comp["spots_farol"] += spots(int(seg_farol or 0), spot_segundos)
                 comp["palavras_hoje"] += int(m["hoje"]["palavras"])
-                comp["palavras_farol"] += len(str(m.get("aviso", "")).split())
+                comp["palavras_farol"] += len(str(texto_farol).split())
                 comp["locais"] += int(m["hoje"]["locais"])
                 comp["comunidades"] += len(m.get("comunidades", []))
             for c in m.get("comunidades", []):

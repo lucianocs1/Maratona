@@ -2,6 +2,40 @@
 
 Este documento explica, em linguagem simples, como o protótipo trata segurança e dados pessoais, e o que mudaria numa implantação real na distribuidora.
 
+## Ameaça → proteção → teste que prova
+
+Cada linha diz o risco, o que o Farol faz contra ele e o teste que falha se a proteção deixar de existir.
+Todos rodam juntos em `powershell -ExecutionPolicy Bypass -File testes\rodar_testes.ps1`.
+
+| Ameaça | Proteção | Teste que prova |
+|---|---|---|
+| Planilha maliciosa: macro, bomba de zip, .xlsx cifrado, .exe renomeado, XML com entidade externa | Portão pela assinatura do arquivo, limites do zip (tamanho, razão, entradas, caminhos), recusa de `vbaProject.bin`/macroEnabled, `defusedxml`, só abas visíveis, só .xlsx e .csv | `testes/api/teste_leitura.py`; `testes/planilha/teste_demo.py` (planilha 5, recusada) |
+| Dado pessoal da planilha vazar (nome, número da casa, medidor, conta) | Minimização na leitura: só as colunas do modelo são lidas; as outras são descartadas antes de qualquer processamento | `testes/api/teste_api.py` (aba Postes), `testes/planilha/teste_tradutor.py` |
+| Número de UC no navegador, no banco, no PDF, no e-mail ou no relatório | O pacote que vai ao navegador troca a UC por código opaco; o banco guarda só agregados; o JSON com UCs só num pedido explícito, Admin ou Operador, registrado | `teste_api.py`, `teste_travas.py`, `teste_radio.py` (e-mail), `teste_relatorios.py`, `testes/navegador/teste_app.mjs` (HTML da página) |
+| Pacote da conferência adulterado, vencido ou de outra pessoa | HMAC-SHA256 com chave só em variável de ambiente, 15 minutos, preso ao usuário e à empresa, JSON conferido de novo pelo esquema fechado; descompressão limitada | `testes/planilha/teste_travas.py`, `teste_api.py` |
+| Erro silencioso na tradução da planilha | Conta fechada (lidas = ok + corrigidas + rejeitadas), dupla conferência por rotina independente, erro inesperado = nada gerado e código ERR-xxxx, log só com o tipo e o lugar do erro | `teste_tradutor.py` (Hypothesis, 50.000 linhas), `teste_conferencia.py`, `teste_api.py` |
+| Aviso sem conferência humana; equipamento vital esquecido | Caixa "Conferi os números e o mapa" obrigatória; equipamento vital rejeitado, corrigido ou fora da concessão bloqueia sempre; acima do limite de rejeição, só com justificativa (na auditoria) | `teste_api.py`, `teste_demo.py` (planilhas 3 e 4), `teste_app.mjs` |
+| Perfil acessar o que não pode | Permissão conferida no servidor em toda rota; a tela só esconde | `testes/api/teste_matriz.py` (cada rota x cada perfil; rota nova sem regra é falha), `teste_acesso.py` |
+| Uma empresa ver ou mudar dados de outra | Toda consulta filtra pela empresa da sessão | `teste_matriz.py` (isolamento), `teste_acesso.py`, `teste_radio.py`, `teste_relatorios.py` |
+| Admin do Farol ver dados operacionais de uma empresa | O perfil só tem cadastro, área de atuação, contagens e auditoria; avisos, histórico, comunidades, rede, relatórios operacionais, planilha e pacotes respondem 403 no servidor (desde 15/10/2026) | `teste_matriz.py`, `teste_area_atuacao.py` |
+| Empresa criar aviso fora da área de atuação | A UC de município fora da área é rejeitada no servidor ("fora da área de atuação da empresa"); empresa sem área não gera aviso; o mapa operacional mostra só a área da empresa | `teste_area_atuacao.py` |
+| KML/GeoJSON malicioso na área de atuação | Até 5 MB; sem DTD, entidade nem script (defusedxml e varredura); só polígonos dentro do Brasil; lido em memória e descartado (só os códigos IBGE ficam); recusa na auditoria | `teste_area_atuacao.py` |
+| E-mail da demonstração chegar a um domínio real | Sem `FAROL_EMAIL_REAL=1`, o servidor só envia para domínios reservados para teste (.example, .test, .invalid, .localhost, example.com/.net/.org), conferido antes de conectar ao SMTP; o resto vira falha registrada. Local: Mailpit (127.0.0.1:1025). A empresa de teste "Energisa" (domínio e CNPJ reais) virou a fictícia DEX, com a troca na auditoria | `teste_correio_demo.py` |
+| Senha fraca, roubada ou força bruta | Argon2id, 12+ caracteres, senha temporária de uso único, 5 erros bloqueiam 15 min, limite por IP, mesma resposta para e-mail desconhecido | `teste_acesso.py`, `teste_senhas.py` |
+| Sessão roubada, pedido forjado de outro site | Cookie HttpOnly, SameSite=Strict, Secure em produção, só o hash do token no banco; origem conferida | `teste_acesso.py` |
+| Script injetado na tela (XSS) | Todo texto da API ou da planilha entra como texto (`textContent`); CSP sem `unsafe-inline` | `teste_app.mjs` (HTML no nome da comunidade vira texto) |
+| Adulterar a auditoria | Só inclusão (gatilhos do banco recusam UPDATE, DELETE e TRUNCATE); cada linha guarda o hash da anterior; "Conferir a integridade" refaz a conta | `testes/api/teste_auditoria.py` (adulteração e linha apagada detectadas) |
+| Fingir quem fez | Nome e perfil copiados do login na linha da auditoria; nunca digitados | `teste_auditoria.py` |
+| PDF e MP3 enviados vazarem do banco | AES-256-GCM com chave só em variável de ambiente, amarrado à empresa, ao envio e ao tipo | `testes/api/teste_radio.py` |
+| Link de confirmação da rádio abusado | Token de 256 bits, só o hash no banco, uso único, 7 dias; abrir o link não confirma (é um POST); origem conferida; o link usa o endereço público configurado, nunca o Host do pedido | `teste_radio.py` |
+| Dado pessoal digitado em texto livre (motivo "Outro", cancelamento, mensagem da rádio) | Recusa números longos (UC, CPF, CEP, telefone), e-mail e site; a tela avisa "não escreva nome de cliente" | `teste_auditoria.py`, `teste_radio.py` |
+| Fórmula maliciosa no CSV exportado | Valores que começam com = + - @ TAB ou CR ganham apóstrofo | `teste_travas.py`, `teste_relatorios.py` |
+| Abuso de envio | 20 planilhas e 30 e-mails para rádios por usuário por hora | `teste_api.py`, `teste_radio.py` |
+| IP falso atrás do proxy | Só o proxy do Render é confiável para o IP e o https; o uvicorn roda sem cabeçalhos de proxy | `teste_proxy.py` |
+| Dado pessoal no mapa estático de demonstração | Minimização no HTML gerado e varredura dos titulares, UCs, imóveis e logradouros | `comunidades.validacao.minimizacao` (Leopoldina e Muriaé) |
+| Computador compartilhado | Ao sair, a tela apaga tudo do usuário anterior | `teste_app.mjs` |
+| Segredo no código | Senhas e chaves só em variável de ambiente ou no `.env` (fora do git); no Render, segredos no painel ou gerados (`generateValue`) | Revisão: `.gitignore` e `render.yaml` |
+
 ## De onde vêm os dados
 
 | Dado | Origem | Pessoal? |
@@ -15,7 +49,7 @@ Este documento explica, em linguagem simples, como o protótipo trata segurança
 
 Nenhum dado de cliente real da distribuidora foi usado até agora.
 
-## O que muda com a planilha, a API e o banco (em construção)
+## A planilha, a API e o banco
 
 Desde 11/10/2026 o Farol está passando de um HTML de demonstração para um app com API em Python e banco Postgres. A entrada passa a ser a planilha que a distribuidora envia, com as UCs afetadas e suas coordenadas. Uma UC com coordenada identifica uma casa, então a planilha é tratada como dado pessoal desde já, mesmo nos testes:
 
@@ -28,10 +62,12 @@ Desde 11/10/2026 o Farol está passando de um HTML de demonstração para um app
 - **Computador compartilhado.** Ao sair, a tela apaga tudo do usuário anterior (resultados, listas e o roteiro), e não só esconde.
 - **Registro de atividades.** Entradas, senhas erradas, bloqueios, cadastros, avisos gerados e textos finais ficam registrados com quem e quando, sem nenhum dado de cliente.
 - **Ainda falta antes de dado real:** segundo fator de autenticação (MFA) para os admins, recuperação de senha por e-mail e uma revisão de segurança independente.
+- **Rádio e e-mail (desde 14/10/2026).** O e-mail para a rádio leva só a mensagem do aviso (comunidades, data, horário, motivo), o município, o código de verificação, o PDF e o MP3. O SMTP vem só de variáveis de ambiente (`FAROL_SMTP_*`); sem ele, o envio por e-mail fica desligado. Localmente, a caixa é o Mailpit (nada sai para a internet). O contato da rádio é de empresa, nunca de cliente.
+- **Relatórios.** Só agregados e o que está gravado; cada PDF ou CSV exportado vira uma linha da auditoria, com o nome de quem gerou, e o código de verificação do relatório sai do hash dessa linha.
 - **Conexões.** O app só fala com a própria API (CSP `connect-src 'self'`) e com os fundos de mapa da Esri. O mapa de demonstração continua sem nenhuma conexão.
 - **Tela sem nada embutido.** A tela (`apresentacao/app/`) carrega o script, o estilo, o Leaflet e as fontes do próprio servidor. A CSP vem no cabeçalho de toda resposta da API: `script-src 'self'` e `style-src 'self'`, sem `unsafe-inline`, mais `frame-ancestors 'none'`. Só a documentação interativa (`/api/docs`, para desenvolvimento) fica fora, porque carrega o Swagger de fora. Todo texto vindo da API ou da planilha entra na tela como texto, nunca como HTML. O teste `testes/navegador/teste_app.mjs` confere que nenhuma UC nem coordenada da planilha aparece no HTML da página ou no PDF.
 - **O dashboard só agrega o histórico.** A rota `/api/painel` (perfis que veem o histórico, só a própria empresa) devolve contagens: avisos, UCs, comunidades, municípios, avisos por mês, os municípios e as comunidades que mais aparecem e os próximos desligamentos. Nada de UC, coordenada ou texto de aviso. O teste `testes/api/teste_api.py` confere os campos, e o `teste_acesso.py`, as permissões e o isolamento entre empresas.
-- **Os pontos das UCs são temporários.** Desde 11/10/2026, para quem enviou a planilha conferir o resultado, a resposta do envio traz um ponto por UC: só latitude, longitude (5 casas, cerca de 1 m) e a comunidade, nunca o número da UC. Os pontos ficam só na memória do navegador e são desenhados num canvas (não entram no HTML). Não vão para o banco, o histórico, o PDF nem o áudio, e somem ao abrir um aviso do histórico, ao trocar de planilha ou ao sair. O perfil Consulta, que só vê o histórico, nunca os vê. A dica de cada ponto mostra só a comunidade. Os testes conferem isso: `testes/api/teste_api.py` (coordenadas só nos pontos e nunca no histórico) e `testes/navegador/teste_app.mjs`. Fora isso, o mapa desenha os contornos públicos dos municípios e de todas as comunidades dos municípios afetados, que vêm do IBGE.
+- **Os pontos das UCs são temporários.** Desde 11/10/2026, para quem enviou a planilha conferir o resultado, a resposta do envio traz um ponto por UC: só latitude, longitude (5 casas, cerca de 1 m) e a comunidade, nunca o número da UC. Os pontos ficam só na memória do navegador e são desenhados num canvas (não entram no HTML). Não vão para o banco, o histórico, o PDF nem o áudio, e somem ao abrir um aviso do histórico, ao trocar de planilha ou ao sair. O perfil Consulta, que só vê o histórico, nunca os vê. A dica de cada ponto mostra só a comunidade. Os testes conferem isso: `testes/api/teste_api.py` (coordenadas só nos pontos e nunca no histórico) e `testes/navegador/teste_app.mjs`. Desde 16/10/2026, para escolher quem será desligado numa base de clientes (nucleo/selecao.py), a leitura da planilha traz também, linha a linha e com o mesmo ciclo de vida dos pontos, a comunidade e os códigos de circuito, conjunto, transformador e bairro (como índices em listas), se a UC está inativa e, só nas linhas sem posição, se tem equipamento vital; nunca o número da UC nem o endereço. Na auditoria, no histórico e no comprovante fica só o critério da escolha (a área com polígonos e vértices, as comunidades e os códigos marcados), nunca a lista de UCs; o critério vai assinado no pacote (HMAC), para o aviso ser exatamente o que foi conferido (`testes/api/teste_escolha.py`, `testes/navegador/teste_escolha.mjs`). Fora isso, o mapa desenha os contornos públicos dos municípios e de todas as comunidades dos municípios afetados, que vêm do IBGE.
 - **Segredos fora do código.** A senha do banco fica só na variável de ambiente `DATABASE_URL`, num arquivo `.env` que o git ignora. Antes de publicar: usuário próprio do app no banco (não o superusuário `postgres`) e senha forte.
 
 ## O que o protótipo protege hoje
@@ -57,7 +93,7 @@ Desde 11/10/2026 o Farol está passando de um HTML de demonstração para um app
 
 **Tamanho do aviso de hoje no modo área.** Para comparar o aviso de hoje com o do Farol numa área, o HTML leva por UC só um código numérico do local que o aviso de hoje citaria (o imóvel, senão a rua) e, para cada código, o número de palavras do nome desse local. Os nomes não vão para o HTML, e os códigos seguem a ordem em que os locais aparecem no cadastro, não a alfabética, então nem o código nem a contagem de palavras permitem reconstruir um imóvel ou uma rua. Risco que fica: o código mostra quais UCs estão no mesmo imóvel ou na mesma rua (um agrupamento sem nome), parecido com o que o transformador de cada UC já mostra; como a rede e os clientes são fictícios, aceitamos esse risco no protótipo.
 
-**Código de verificação no PDF.** O rodapé do roteiro traz um código SHA-256 calculado no navegador. Qualquer alteração no texto gera um código diferente.
+**Código de verificação no PDF.** No mapa estático, o rodapé do roteiro traz um código SHA-256 calculado no navegador. No app, o PDF é gerado no servidor e traz o código FRL-… do aviso (do hash da linha da auditoria que o registrou) e o SHA-256 do texto. Qualquer alteração no texto gera um código diferente.
 
 - O código é calculado sobre este texto, em UTF-8, com as linhas separadas por quebra de linha simples:
   ```

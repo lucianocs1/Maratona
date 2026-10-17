@@ -77,21 +77,43 @@ _FRASE = re.compile(
     r"(?P<resto>.*)$", re.S)
 
 
+def _pedido_livre(livre: str) -> str:
+    """O simulado entende só algumas palavras-chave do pedido livre."""
+    p = livre.lower()
+    pedido = ("whatsapp" if "whats" in p else "sms" if "sms" in p else
+              "acolhedor" if re.search(r"acolhed|cordial|gentil|simp[aá]tic|desculp", p) else
+              "curto" if re.search(r"curt|resum|breve|r[aá]pid", p) else "")
+    if not pedido:
+        raise CopilotoIndisponivel("O copiloto simulado entende: curto, WhatsApp, SMS e acolhedor. "
+                                   "Com a IA de verdade (FAROL_IA=anthropic), qualquer pedido funciona.")
+    return pedido
+
+
+def _simulado_generico(texto: str, pedido: str) -> str:
+    """O texto não segue a frase padrão (a mensagem pelo modelo da empresa, editável): regras que só tiram a
+    abertura ou acrescentam um título ou uma frase, sem mexer em nenhum dado do aviso."""
+    sem_abertura = re.sub(r"^(?:Atenção|Aviso|Importante)[^.!:]*[.!]\s*", "", texto)
+    if pedido == "curto":
+        if sem_abertura == texto:
+            raise CopilotoIndisponivel("O copiloto simulado não achou o que cortar neste texto. Use \"Desfazer edição\" "
+                                       "e tente de novo, ou, com a IA de verdade (FAROL_IA=anthropic), qualquer texto funciona.")
+        return sem_abertura
+    if pedido == "whatsapp":
+        return f"*Desligamento programado de energia*\n{sem_abertura}"
+    if pedido == "sms":
+        return sem_abertura
+    return f"{texto} Pedimos desculpas pelo transtorno e agradecemos a compreensão."
+
+
 def _simulado(texto: str, pedido: str, livre: str) -> str:
-    m = _FRASE.search(" ".join(texto.split()))
+    if pedido == "livre":
+        pedido = _pedido_livre(livre)
+    texto = " ".join(texto.split())
+    m = _FRASE.search(texto)
     if not m:
-        raise CopilotoIndisponivel("O copiloto simulado só entende o aviso no modelo padrão em português. "
-                                   "Use \"Desfazer edição\" e tente de novo.")
+        return _simulado_generico(texto, pedido)
     quem, mun, onde, data, hor, resto = (m["quem"], m["mun"], m["onde"], m["data"], m["hor"], m["resto"].strip())
     onde = f" ({onde})" if onde else ""
-    if pedido == "livre":  # o simulado entende só algumas palavras-chave
-        p = livre.lower()
-        pedido = ("whatsapp" if "whats" in p else "sms" if "sms" in p else
-                  "acolhedor" if re.search(r"acolhed|cordial|gentil|simp[aá]tic|desculp", p) else
-                  "curto" if re.search(r"curt|resum|breve|r[aá]pid", p) else "")
-        if not pedido:
-            raise CopilotoIndisponivel("O copiloto simulado entende: curto, WhatsApp, SMS e acolhedor. "
-                                       "Com a IA de verdade (FAROL_IA=anthropic), qualquer pedido funciona.")
     if pedido == "curto":
         return f"Atenção, moradores de {quem}, em {mun}: dia {data}, das {hor}, desligamento programado de energia. {resto}".strip()
     if pedido == "whatsapp":

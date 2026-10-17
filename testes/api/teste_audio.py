@@ -3,8 +3,8 @@
 Roda num esquema próprio (FAROL_ESQUEMA=teste_audio), apagado no fim. Confere:
 - a locução: "8h" vira "8 horas", "14h30" vira "14 horas e 30", "20/11" vira "20 de novembro";
 - o MP3: quadros MPEG válidos, mono, e a duração coerente com o tamanho do texto;
-- quem pode: Admin da empresa, Operador e Consulta; o Admin do Farol não; sem login, 401;
-- erros: idioma sem voz, texto vazio ou longo demais (422); nome do arquivo só em ASCII;
+- quem pode: Admin da empresa e Operador (quem gera o aviso); Consulta e Admin do Norte não; sem login, 401;
+- erros: idioma sem voz, texto vazio ou longo demais, campos longos demais (422); nome do arquivo só em ASCII;
 - o registro de atividade guarda que o áudio foi gerado (sem o texto).
 
 Uso (na raiz): uv run python -W ignore testes/api/teste_audio.py
@@ -99,15 +99,26 @@ conferir("duração coerente com o texto (entre metade e o dobro da estimativa d
 disp = r.headers.get("content-disposition", "")
 conferir("nome do arquivo só em ASCII", disp == 'attachment; filename="farol-aviso-sao-joao-nepomuceno.mp3"', disp)
 
-conferir("Consulta: pode gerar o áudio (para o histórico)", cliente("consulta@emg.example").post("/api/audio", json=pedido).status_code == 200)
+consulta = cliente("consulta@emg.example")
+conferir("Consulta: não gera o áudio (403, só quem gera o aviso)", consulta.post("/api/audio", json=pedido).status_code == 403)
+conferir("Consulta: nem o do comparativo (403)", consulta.post("/api/audio", json={**pedido, "comparativo": True}).status_code == 403)
 conferir("Admin da empresa: pode", cliente("admin@emg.example").post("/api/audio", json=pedido).status_code == 200)
-conferir("Admin do Farol: não pode (403)", cliente("admin@farol.example").post("/api/audio", json=pedido).status_code == 403)
-erros = {"idioma en": op.post("/api/audio", json={**pedido, "idioma": "en"}).status_code,
+conferir("Admin do Norte: não pode (403)", cliente("admin@farol.example").post("/api/audio", json=pedido).status_code == 403)
+ingles = op.post("/api/audio", json={**pedido, "idioma": "en", "texto": "Attention, listeners. On November 20, from 8 a.m. to 2 p.m., "
+                                                                     "there will be a scheduled power outage in Graminha."})
+conferir("inglês (Fase K): MP3 com a voz en_US-ljspeech (domínio público)", ingles.status_code == 200 and ingles.headers.get("content-type") == "audio/mpeg"
+         and len(ingles.content) > 20_000, f"{ingles.status_code} {len(ingles.content)}")
+erros = {"idioma es (sem voz com licença clara)": op.post("/api/audio", json={**pedido, "idioma": "es"}).status_code,
          "texto vazio": op.post("/api/audio", json={**pedido, "texto": "   "}).status_code,
-         "texto longo": op.post("/api/audio", json={**pedido, "texto": "palavra " * 500}).status_code}
-conferir("erros: idioma sem voz, texto vazio, texto longo demais (422)", all(v == 422 for v in erros.values()), str(erros))
+         "texto longo": op.post("/api/audio", json={**pedido, "texto": "palavra " * 500}).status_code,
+         "texto acima do limite do comparativo": op.post("/api/audio", json={**pedido, "comparativo": True,
+                                                         "texto": "a" * (app_mod.audio.MAX_CARACTERES_COMPARATIVO + 1)}).status_code,
+         "idioma longo": op.post("/api/audio", json={**pedido, "idioma": "x" * 11}).status_code,
+         "município longo": op.post("/api/audio", json={**pedido, "municipio": "x" * 101}).status_code}
+conferir("erros: idioma sem voz, texto vazio, texto longo demais, campos longos demais (422)",
+         all(v == 422 for v in erros.values()), str(erros))
 with conectar() as c, c.cursor() as cur:
-    cur.execute("SELECT detalhe FROM registro WHERE acao = 'gerou o áudio do aviso'")
+    cur.execute("SELECT detalhe FROM registro WHERE acao = 'gerou MP3 do aviso'")
     reg = [d for (d,) in cur.fetchall()]
 conferir("registro: áudio gerado (município e duração, sem o texto)", len(reg) == 3 and all("Graminha" not in d for d in reg), str(reg))
 # produção no plano gratuito (FAROL_AUDIO=0): a tela é avisada e a API recusa, sem carregar a voz

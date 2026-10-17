@@ -8,7 +8,10 @@
 - Antes de falar, o texto passa por nucleo/locucao.py ("8h às 14h" -> "8 horas às 14 horas").
 - Isolado neste módulo: trocar de motor (um serviço de nuvem, por exemplo) não mexe no resto.
 
-A voz padrão é FAROL_VOZ (padrão pt_BR-faber-medium). Só português por enquanto.
+A voz padrão é FAROL_VOZ (padrão pt_BR-faber-medium). Fase K: inglês com en_US-ljspeech-medium (dados LJ Speech em domínio
+público, treinada do zero). Espanhol: as vozes do repositório são ajustes da voz "lessac" (dados com licença só de pesquisa,
+Blizzard 2013) ou não dizem de onde partiram; por segurança, o espanhol fica sem áudio, a não ser que a empresa aceite a
+licença e defina FAROL_VOZ_ES=es_ES-davefx-medium (ORIGEM.md).
 Uso (amostras das vozes): uv run python -m comunidades.apresentacao.audio
 """
 
@@ -27,12 +30,20 @@ from .. import config as C
 from ..nucleo.locucao import texto_para_fala
 
 REPOSITORIO = "https://huggingface.co/rhasspy/piper-voices/resolve/main"
-VOZES = {  # nome -> caminho no repositório (todas pt-BR, qualidade média, dados de treino CC0)
+VOZES = {  # nome -> caminho no repositório (qualidade média)
     "pt_BR-faber-medium": "pt/pt_BR/faber/medium",
     "pt_BR-cadu-medium": "pt/pt_BR/cadu/medium",
     "pt_BR-jeff-medium": "pt/pt_BR/jeff/medium",
+    "en_US-ljspeech-medium": "en/en_US/ljspeech/medium",
+    "es_ES-davefx-medium": "es/es_ES/davefx/medium",
 }
 VOZ_PADRAO = os.environ.get("FAROL_VOZ") or "pt_BR-faber-medium"
+# a voz de cada idioma do aviso; None: o idioma fica sem áudio (a tela avisa)
+VOZ_DO_IDIOMA = {"pt-BR": VOZ_PADRAO, "en": "en_US-ljspeech-medium", "es": os.environ.get("FAROL_VOZ_ES") or None}
+
+
+def idiomas_com_voz() -> list[str]:
+    return [i for i, v in VOZ_DO_IDIOMA.items() if v in VOZES]
 PASTA = C.RAW / "vozes"
 KBPS = 128
 TAXA_SAIDA = 44_100
@@ -81,11 +92,12 @@ def _voz(nome: str):
     return PiperVoice.load(str(garantir_voz(nome)))
 
 
-def mp3(texto: str, idioma: str = "pt-BR", voz: str = VOZ_PADRAO, max_caracteres: int = MAX_CARACTERES) -> tuple[bytes, float]:
-    """(MP3, duração em segundos) do texto falado."""
-    if idioma != "pt-BR":
-        raise ValueError("Por enquanto o áudio é só em português.")
-    fala = texto_para_fala(texto)
+def mp3(texto: str, idioma: str = "pt-BR", voz: str | None = None, max_caracteres: int = MAX_CARACTERES) -> tuple[bytes, float]:
+    """(MP3, duração em segundos) do texto falado, com a voz do idioma (ou a voz pedida, para as amostras)."""
+    voz = voz or VOZ_DO_IDIOMA.get(idioma)
+    if voz not in VOZES:
+        raise ValueError("Sem voz com licença adequada para este idioma: o aviso vai sem áudio (veja ORIGEM.md).")
+    fala = texto_para_fala(texto, idioma)
     if not fala or len(fala) > max_caracteres:
         raise ValueError(f"O texto do áudio tem de ter de 1 a {max_caracteres:,} caracteres.".replace(",", "."))
     with _trava:
@@ -110,7 +122,7 @@ if __name__ == "__main__":
     saida = C.SAIDA / "audio_amostras"
     saida.mkdir(parents=True, exist_ok=True)
     print(f"Texto falado: {texto_para_fala(exemplo)}")
-    for nome in VOZES:
+    for nome in [v for v in VOZES if v.startswith("pt_BR")]:
         dados, seg = mp3(exemplo, voz=nome)
         (saida / f"{nome}.mp3").write_bytes(dados)
         print(f"{nome}: {seg:.1f} s, {len(dados) / 1024:.0f} KB -> {saida / (nome + '.mp3')}")

@@ -5,7 +5,7 @@
 <!-- Só os scripts embutidos rodam (pelo hash) e só os fundos de mapa da Esri vêm de fora. Calculada pelo entrada.py. -->
 <meta http-equiv="Content-Security-Policy" content="/*__CSP__*/">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Farol · Escolha a área</title>
+<title>Norte · Escolha a área</title>
 <link rel="icon" type="image/svg+xml" href="__FAVICON__">
 <!-- IBM Plex Sans embutida (SIL OFL 1.1; ver vendor/ibm-plex/) -->
 <style>/*__FONTES__*/</style>
@@ -72,7 +72,9 @@ h1 { margin: 0 0 20px; font-size: 22px; font-weight: 600; text-align: center; }
 /* Leaflet no tema da página: botões de 44 px, popup e dica escuros */
 .leaflet-container { background: var(--noite); font: 14px/1.5 "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif; }
 .leaflet-bar { border: 1px solid var(--linha) !important; box-shadow: none !important; }
-.leaflet-bar a, .leaflet-bar a:hover { width: 44px; height: 44px; line-height: 44px; font-size: 20px; background: var(--sup); color: var(--texto); border-color: var(--linha); }
+/* .leaflet-touch: o Leaflet põe 30 px em qualquer navegador com Pointer Events; aqui o + e o − ficam com 44 px */
+.leaflet-bar a, .leaflet-touch .leaflet-bar a, .leaflet-touch .leaflet-control-zoom-in, .leaflet-touch .leaflet-control-zoom-out {
+  width: 44px; height: 44px; line-height: 44px; font-size: 20px; background: var(--sup); color: var(--texto); border-color: var(--linha); }
 .leaflet-bar a:hover { background: var(--sup2); }
 .leaflet-control-attribution { background: rgba(21, 32, 43, .88) !important; color: var(--texto2) !important; font-size: 11.5px; }
 .leaflet-control-attribution a { color: var(--info) !important; }
@@ -137,8 +139,8 @@ code { font-family: "IBM Plex Mono", ui-monospace, Consolas, monospace; font-siz
 <main>
   <header class="topo">
     <!--__LOGO__-->
-    <p class="nome">Farol</p>
-    <p class="slogan">Cada comunidade avisada pelo nome</p>
+    <p class="nome">Norte</p>
+    <p class="slogan">O aviso certo, para a comunidade certa</p>
   </header>
   <section class="escolha" aria-labelledby="pergunta">
     <h1 id="pergunta">Qual área você quer abrir?</h1>
@@ -148,11 +150,11 @@ code { font-family: "IBM Plex Mono", ui-monospace, Consolas, monospace; font-siz
         <h2 id="titulo-concessao">Área de concessão <span id="sigla"></span></h2>
         <dl class="contagem">
           <div><dt>municípios</dt><dd id="n-municipios"></dd></div>
-          <div><dt>com o Farol pronto</dt><dd id="n-prontos"></dd></div>
+          <div><dt>com o Norte pronto</dt><dd id="n-prontos"></dd></div>
         </dl>
         <ul class="legenda">
           <li><span class="amostra concessao"></span>Contorno da concessão</li>
-          <li><span class="amostra pronto"></span>Farol pronto: clique para abrir</li>
+          <li><span class="amostra pronto"></span>Norte pronto: clique para abrir</li>
           <li><span class="amostra pendente"></span>Ainda não processado</li>
         </ul>
         <div class="acoes" role="group" aria-label="Enquadrar o mapa">
@@ -162,13 +164,13 @@ code { font-family: "IBM Plex Mono", ui-monospace, Consolas, monospace; font-siz
         <p>Contorno real da concessão (KML da Energisa) e malhas reais do IBGE.</p>
       </aside>
     </div>
-    <p class="prontos-titulo">Municípios com o Farol pronto</p>
+    <p class="prontos-titulo">Municípios com o Norte pronto</p>
     <!--__CARTOES__-->
   </section>
   <!--__ADMIN__-->
   <footer>
     <p>Rede elétrica e clientes fictícios. Território, endereços e vias reais (IBGE Censo 2022 e OpenStreetMap).</p>
-    <p>Para outro município, gere o Farol pelo comando com <code>--coordenada</code> ou <code>--distribuidora</code>.</p>
+    <p>Para outro município, gere o Norte pelo comando com <code>--coordenada</code> ou <code>--distribuidora</code>.</p>
   </footer>
 </main>
 <script>/*__LEAFLET_JS__*/</script>
@@ -205,7 +207,7 @@ function no(tag, classe, texto) {
 
 function rotulo(f) {
   const p = f.properties;
-  return no('span', '', `${p.NM_MUN}/${p.SIGLA_UF}${pronto(f) ? ' · Farol pronto' : ''}`);
+  return no('span', '', `${p.NM_MUN}/${p.SIGLA_UF}${pronto(f) ? ' · Norte pronto' : ''}`);
 }
 
 function conteudoPopup(f) {
@@ -213,7 +215,7 @@ function conteudoPopup(f) {
   cab.append(no('strong', '', p.NM_MUN), no('span', 'uf', p.SIGLA_UF));
   raiz.append(cab);
   if (!pronto(f)) {
-    raiz.append(no('p', 'pop-situacao', `Na concessão ${D.concessao.sigla}. Ainda não processado no Farol.`));
+    raiz.append(no('p', 'pop-situacao', `Na concessão ${D.concessao.sigla}. Ainda não processado no Norte.`));
     return raiz;
   }
   const dl = no('dl', 'numeros');

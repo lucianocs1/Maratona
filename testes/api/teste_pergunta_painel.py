@@ -127,7 +127,7 @@ resumo = {"linhas": 1, "validas": 1, "problemas": 0, "fora_da_concessao": 0, "pr
 
 
 def gravar(empresa_id, dias_atras, data, ms):
-    id_ = banco_acesso.gravar_aviso(empresa_id, dono["id"], data, "8h às 14h", "pt-BR", resumo, ms)
+    id_ = banco_acesso.gravar_aviso(empresa_id, dono["id"], data, "8h às 14h", "pt-BR", resumo, ms, "manutencao_preventiva", "Manutenção preventiva", lambda i: f"aviso {i}")["id"]
     if dias_atras:
         with conectar() as c:
             c.execute("UPDATE aviso SET criado_em = now() - make_interval(days => %s) WHERE id = %s", (dias_atras, id_))

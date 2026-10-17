@@ -32,7 +32,7 @@ SAIDA_RAIZ = C.RAIZ / "saida"                              # onde fica a página
 ARQ_RESUMO = C.SAIDA / "resumo_mapa.json"                  # só contagens, para o cartão do município na entrada
 LEAFLET = Path(__file__).with_name("vendor") / "leaflet"   # Leaflet 1.9.4 embutido (sem CDN)
 PLEX = Path(__file__).with_name("vendor") / "ibm-plex"     # fontes IBM Plex embutidas (OFL)
-MARCA = Path(__file__).with_name("marca")                  # logo do Farol
+MARCA = Path(__file__).with_name("marca")                  # logo do Norte
 FONTES = [("IBM Plex Sans", "ibm-plex-sans-latin-400-normal.woff2", 400),
           ("IBM Plex Sans", "ibm-plex-sans-latin-500-normal.woff2", 500),
           ("IBM Plex Sans", "ibm-plex-sans-latin-600-normal.woff2", 600),
@@ -207,7 +207,7 @@ def favicon() -> str:
 
 
 def logo_com_feixe() -> str:
-    """Logo do Farol com os dois feixes num grupo (class="feixe"), para a abertura girar só o feixe.
+    """Logo do Norte com os dois feixes num grupo (class="feixe"), para a abertura girar só o feixe.
     O desenho é o mesmo do farol.svg."""
     svg = (MARCA / "farol.svg").read_text(encoding="utf-8").strip()
     feixes = re.findall(r'\n\s*<path [^>]*opacity="0\.45"/>', svg)

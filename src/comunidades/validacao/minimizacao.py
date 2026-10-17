@@ -30,8 +30,29 @@ import geopandas as gpd
 
 from .. import config as C
 from ..apresentacao.mapa import ARQ_RESUMO, ARQ_SAIDA, SAIDA_RAIZ
+from ..nucleo.planilha import e_so_tipo_de_via
 
 CAMPOS = {"TITULAR": "titular", "NOME_IMOVEL": "nome de imóvel", "LOGRADOURO": "logradouro"}
+
+# Número de casa e CEP no aviso de hoje: o aviso cita a rua, nunca o endereço completo.
+# Nomes com número ("Estrada 267", "Rodovia BR 116", "Rua 27 de Abril") e a data e o horário do aviso passam.
+ENDERECO_COMPLETO = re.compile(
+    r"\bCEP\b|\b\d{2}\.?\d{3}-\d{3}\b|\b\d{8}\b"                                    # CEP
+    r"|[A-Za-zÀ-ÿ]\s*,\s*\d+"                                                        # "Rua X, 123"
+    r"|\b(?P<num>n[º°]|n\.|no\.|num\.?|n[úu]mero)\s*\d+"                             # "nº 45"
+    r"|\b(casa|apto?|apartamento|lote|quadra|qd|bloco|sala)\.?\s*\d+", re.I)          # "casa 2"
+
+
+def numero_de_casa_ou_cep(texto: str) -> list[str]:
+    """Os trechos do texto que parecem número de casa, complemento ou CEP (vazio: nenhum).
+    "Beco Número 399" (nome de via do CNEFE: o "número" vem logo depois do tipo de via) não conta."""
+    achados = []
+    for m in ENDERECO_COMPLETO.finditer(texto):
+        antes = texto[:m.start()].split()
+        if m.group("num") and antes and e_so_tipo_de_via(antes[-1]):
+            continue
+        achados.append(m.group(0))
+    return achados
 
 
 def _palavras(texto: str) -> list[str]:
@@ -108,6 +129,8 @@ def varrer(mapa: Path = ARQ_SAIDA) -> dict:
     numeros = set(re.findall(r"\d+", texto + avisos))
     r["procurados"]["número de UC"] = ucs["UC"].nunique()
     r["proibidos"] += [("número de UC", u) for u in sorted(set(ucs["UC"].astype(str)) & numeros)]
+    # o aviso de hoje cita a rua, nunca o número da casa nem o CEP
+    r["proibidos"] += [("número de casa ou CEP (aviso de hoje)", t) for t in sorted(set(numero_de_casa_ou_cep(avisos)))]
     return r
 
 

@@ -43,6 +43,12 @@ raio_rede_m = 500           # ponto da obra: distância máxima até a rede de m
 [janela]
 razao_muito_pior = 1.5                      # a partir desta razão, avisa que a janela escolhida é muito pior
 
+[planilha]
+epsg_utm = 31983                            # fuso UTM das colunas COORD_X/COORD_Y (SIRGAS 2000 / UTM 23S)
+ponto_isolado_km = 20.0                     # ponto mais longe que isso do vizinho mais próximo da planilha: aviso
+muitas_ucs_mesma_coordenada = 10            # a mesma coordenada em tantas UCs ou mais: aviso (suspeito)
+limite_rejeitadas = 0.02                    # mais de 2% de linhas rejeitadas: o aviso só sai com justificativa
+
 # ---------------------------------------------------------------------------
 # Perfis de sensibilidade por atividade.
 # Hipóteses de demonstração, a validar com a distribuidora e por região (a confirmar).

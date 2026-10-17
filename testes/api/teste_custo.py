@@ -112,7 +112,7 @@ conferir("/api/config: a tela recebe a tabela de rádio da distribuidora", cfg["
 dono = banco_acesso.usuario_por_email("operador@emg.example")
 municipio = {**mun("3138401", 20, 100), "nome": "Leopoldina"}
 id_ = banco_acesso.gravar_aviso(dono["empresa_id"], dono["id"], f"{date.today() + timedelta(days=5):%d/%m}", "8h às 14h", "pt-BR",
-                                {"linhas": 1, "validas": 1, "problemas": 0, "fora_da_concessao": 0, "prazo": {}}, [municipio])
+                                {"linhas": 1, "validas": 1, "problemas": 0, "fora_da_concessao": 0, "prazo": {}}, [municipio], "manutencao_preventiva", "Manutenção preventiva", lambda i: f"aviso {i}")["id"]
 p = op.get("/api/painel").json()["comparativo"]
 conferir("/api/painel: o comparativo traz os spots (4 contra 1)", (p["spots_hoje"], p["spots_farol"]) == (4, 1), str(p))
 j = op.post("/api/painel/perguntar", json={"pergunta": "Quanto tempo o aviso por comunidade economiza no rádio?"}).json()

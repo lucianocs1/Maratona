@@ -1,8 +1,9 @@
 {
  "municipio": "Muriaé",
  "uf": "MG",
+ "codigo_ibge": "3143906",
  "mapa": "muriae/mapa_comunidades.html",
  "clientes": 59091,
  "comunidades": 159,
- "chaves": 1361
+ "chaves": 1364
 }
