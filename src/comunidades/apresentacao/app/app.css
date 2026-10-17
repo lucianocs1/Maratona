@@ -57,6 +57,12 @@ code { font-family: "IBM Plex Mono", ui-monospace, Consolas, monospace; font-siz
 .topo .conta button { background: rgba(255, 255, 255, .10); color: #FFFFFF; border-color: rgba(255, 255, 255, .45); }
 .topo .conta button:hover { background: rgba(245, 184, 61, .2); border-color: var(--ambar); }
 .topo :focus-visible { outline-color: var(--ambar); }
+/* barra alinhada: marca à esquerda e botões à direita na mesma linha; a faixa de demonstração ocupa a linha de baixo */
+@media (min-width: 600px) {
+  .topo { display: grid; grid-template-columns: auto minmax(0, 1fr); column-gap: 16px; row-gap: 8px; }
+  .topo .topo-acoes { justify-content: flex-end; }
+  .topo .faixa { grid-column: 1 / -1; grid-row: 2; justify-self: start; }
+}
 .marca { display: flex; align-items: center; gap: 10px; }
 .nome { margin: 0; font-size: 1.25rem; font-weight: 600; line-height: 1.1; }
 .slogan { margin: 0; font-size: 0.8125rem; color: var(--texto2); }
