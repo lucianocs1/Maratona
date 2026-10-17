@@ -53,10 +53,37 @@ code { font-family: "IBM Plex Mono", ui-monospace, Consolas, monospace; font-siz
   padding: 10px 20px; background: var(--faixa); border-bottom: 3px solid var(--ambar); color: #FFFFFF; }
 .topo .nome { color: #FFFFFF; }
 .topo .slogan { color: var(--ambar); }
-.topo .conta { color: #FFFFFF; }
-.topo .conta button { background: rgba(255, 255, 255, .10); color: #FFFFFF; border-color: rgba(255, 255, 255, .45); }
-.topo .conta button:hover { background: rgba(245, 184, 61, .2); border-color: var(--ambar); }
 .topo :focus-visible { outline-color: var(--ambar); }
+/* Menu da conta (topo): um botão com as iniciais abre Acessibilidade, idioma, tema, ajuda e sair */
+.topo-acoes { position: relative; }
+.conta-botao { display: inline-flex; align-items: center; gap: 10px; padding: 0 12px 0 6px; border-radius: 999px; background: rgba(255, 255, 255, .10);
+  color: #FFFFFF; border-color: rgba(255, 255, 255, .45); font-weight: 600; }
+.conta-botao:hover, .conta-botao[aria-expanded="true"] { background: rgba(245, 184, 61, .2); border-color: var(--ambar); }
+.conta-botao .seta { transition: transform .15s; }
+.conta-botao[aria-expanded="true"] .seta { transform: rotate(180deg); }
+.conta-botao:not(.com-usuario) { padding-left: 12px; }
+.conta-botao:not(.com-usuario) .avatar, .conta-botao.com-usuario .icone-menu { display: none; }
+.avatar { display: inline-grid; place-items: center; width: 34px; height: 34px; border-radius: 50%; background: #F2C14E; color: #0B1B2B;
+  font-size: 0.8125rem; font-weight: 700; letter-spacing: .02em; flex: none; }
+.avatar.grande { width: 44px; height: 44px; font-size: 1rem; }
+.menu-conta { position: absolute; z-index: 2600; right: 0; top: calc(100% + 8px); width: min(320px, calc(100vw - 24px)); display: grid; gap: 2px; padding: 8px;
+  background: var(--sup); color: var(--texto); border: 1px solid var(--linha); border-radius: 14px; box-shadow: 0 14px 40px rgba(0, 0, 0, .35); }
+.menu-conta[hidden] { display: none; }
+.menu-conta :focus-visible { outline-color: var(--foco); }
+.menu-usuario { display: flex; align-items: center; gap: 12px; padding: 8px 10px 12px; margin-bottom: 4px; border-bottom: 1px solid var(--linha);
+  font-size: 0.875rem; font-weight: 600; overflow-wrap: anywhere; }
+.menu-usuario[hidden] { display: none; }
+.menu-item { display: flex; align-items: center; gap: 12px; width: 100%; min-height: 44px; padding: 0 12px; border: 0; border-radius: 10px; background: transparent;
+  color: var(--texto); font-size: 0.9375rem; text-align: left; cursor: pointer; }
+.menu-item:hover:not(:disabled) { background: var(--sup2); filter: none; }
+.menu-item svg { flex: none; color: var(--texto2); }
+.menu-idioma { display: grid; gap: 6px; padding: 8px 12px; cursor: default; }
+.menu-idioma-rotulo { display: flex; align-items: center; gap: 12px; }
+.menu-idioma select { width: 100%; }
+.menu-sep { width: 100%; margin: 6px 0; border: 0; border-top: 1px solid var(--linha); }
+#contaItens { display: grid; gap: 2px; }
+#contaItens[hidden] { display: none; }
+@media (max-width: 599px) { .conta-rotulo { display: none; } .conta-botao { padding: 0 10px 0 6px; } .conta-botao:not(.com-usuario) { padding-left: 10px; } }
 /* barra alinhada: marca à esquerda e botões à direita na mesma linha; a faixa de demonstração ocupa a linha de baixo */
 @media (min-width: 600px) {
   .topo { display: grid; grid-template-columns: auto minmax(0, 1fr); column-gap: 16px; row-gap: 8px; }
@@ -467,8 +494,6 @@ button.perigo:hover:not(:disabled) { background: color-mix(in srgb, var(--erro) 
 
 /* ---------- Fase E: topo (tema e ajuda), subabas, dicas "?", rádios, configurações e ajuda ---------- */
 .topo-acoes { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
-#botaoTema { background: rgba(255, 255, 255, .10); color: #FFFFFF; border-color: rgba(255, 255, 255, .45); }
-#botaoTema:hover { background: rgba(245, 184, 61, .2); border-color: var(--ambar); }
 .subabas { display: flex; flex-wrap: wrap; gap: 6px; }
 .subabas button { background: var(--sup); border-color: var(--linha); color: var(--texto2); border-radius: 999px; }
 .subabas button[aria-current="page"] { background: var(--acento-claro); border-color: var(--acento-borda); color: var(--texto); font-weight: 600; }
@@ -565,7 +590,7 @@ img, video, canvas { max-width: 100%; }
   .topo { padding: max(8px, env(safe-area-inset-top)) max(12px, env(safe-area-inset-right)) 8px max(12px, env(safe-area-inset-left)); gap: 8px; }
   .slogan { display: none; }
   .faixa { font-size: 0.75rem; padding: 4px 8px; }
-  .topo-acoes { width: 100%; }
+  .topo-acoes { width: auto; margin-left: auto; }
   .painel { padding: 12px max(12px, env(safe-area-inset-right)) 12px max(12px, env(safe-area-inset-left)); gap: 12px; }
   .cartao { padding: 14px; border-radius: 12px; }
   .tela-acesso { padding: 16px 12px; }
@@ -712,7 +737,6 @@ button.link { background: none; border: 0; padding: 0; min-height: 44px; color: 
 
 /* ---------- Bloco C: tema claro ---------- */
 /* o cabeçalho é sempre escuro (a faixa da Noite): os rótulos dele em branco, nos dois temas */
-.topo label, .topo .seletor-idioma, .topo .seletor-idioma span { color: #FFFFFF; }
 .seletor-idioma { display: flex; align-items: center; gap: 8px; font-size: 0.8125rem; }
 .topo select { background: rgba(255, 255, 255, .10); color: #FFFFFF; border-color: rgba(255, 255, 255, .55); }
 .topo select option { color: #0E1620; background: #FFFFFF; }
@@ -722,9 +746,6 @@ button.link { background: none; border: 0; padding: 0; min-height: 44px; color: 
 /* ---------- Bloco D: painel Acessibilidade ---------- */
 @font-face { font-family: "Atkinson Hyperlegible"; font-weight: 400; font-display: swap; src: url("/assets/vendor/atkinson/atkinson-hyperlegible-latin-400-normal.woff2") format("woff2"); }
 @font-face { font-family: "Atkinson Hyperlegible"; font-weight: 700; font-display: swap; src: url("/assets/vendor/atkinson/atkinson-hyperlegible-latin-700-normal.woff2") format("woff2"); }
-.botao-a11y { display: inline-flex; align-items: center; gap: 6px; background: #F2C14E; color: #0B1B2B; border-color: #F2C14E; font-weight: 600; }
-.botao-a11y:hover:not(:disabled) { filter: none; background: #E5B23C; }
-.topo .botao-a11y:focus-visible { outline: 3px solid #FFFFFF; outline-offset: 2px; }
 .painel-a11y { position: fixed; z-index: 2500; top: 64px; right: 16px; width: min(380px, calc(100% - 32px)); max-height: calc(100% - 80px); overflow-y: auto;
   display: grid; gap: 10px; padding: 18px; }
 .painel-a11y h2 { margin: 0; font-size: 1.125rem; }

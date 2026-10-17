@@ -25,11 +25,11 @@ await tecla(p, 'Tab', 'Tab', 9);
 conferir('o primeiro Tab mostra "Pular para o conteúdo" (visível no foco)', await p.avaliar(`document.activeElement?.id === 'pular' && $('pular').getBoundingClientRect().top >= 0`));
 await tecla(p, 'Enter', 'Enter', 13);
 conferir('"Pular para o conteúdo" leva ao título da tela', await p.avaliar(`document.activeElement?.tagName === 'H1'`));
-conferir('botão Acessibilidade no topo da tela de entrar', await p.avaliar(`!!$('botaoAcessibilidade').offsetParent && $('botaoAcessibilidade').textContent.includes('Acessibilidade')`));
+conferir('menu no topo da tela de entrar, com o botão Acessibilidade dentro', await p.avaliar(`!!$('botaoConta').offsetParent && ($('botaoConta').click(), !!$('botaoAcessibilidade').offsetParent && $('botaoAcessibilidade').textContent.includes('Acessibilidade'))`));
 await p.avaliar(`($('botaoAcessibilidade').click(), 0)`);
 conferir('abre o painel (aria-expanded) com o foco no título', await p.avaliar(`!$('painelAcessibilidade').hidden && $('botaoAcessibilidade').getAttribute('aria-expanded') === 'true' && document.activeElement?.id === 'a11yTitulo'`));
 await tecla(p, 'Escape', 'Escape', 27);
-conferir('Esc fecha e o foco volta ao botão', await p.avaliar(`$('painelAcessibilidade').hidden && document.activeElement?.id === 'botaoAcessibilidade'`));
+conferir('Esc fecha e o foco volta ao botão do menu', await p.avaliar(`$('painelAcessibilidade').hidden && document.activeElement?.id === 'botaoConta'`));
 await p.avaliar(`($('botaoAcessibilidade').click(), document.querySelector('[data-texto="200"]').click(), 0)`);
 conferir('A++: texto a 200% (aria-pressed)', await p.avaliar(`parseFloat(getComputedStyle(document.body).fontSize) === 30 && document.querySelector('[data-texto="200"]').getAttribute('aria-pressed') === 'true'`),
   await p.avaliar(`getComputedStyle(document.body).fontSize`));

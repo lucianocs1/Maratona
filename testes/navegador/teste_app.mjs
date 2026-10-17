@@ -621,6 +621,17 @@ const ucs = readFileSync(PLANILHA, 'utf-8').split(/\r?\n/).slice(1).filter(Boole
     && /Rádios e configurações/.test(ajuda.texto) && /Auditoria/.test(ajuda.texto), ajuda.texto.slice(0, 120));
   await p.avaliar(`(document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' })), 0)`);
   conferir('Ajuda: fecha com Esc', await p.avaliar(`$('caixaAjuda').hidden`));
+  // menu da conta no topo: iniciais, itens na ordem, Esc fecha e devolve o foco, clique fora fecha
+  await p.avaliar(`($('botaoConta').click(), 0)`);
+  const mc = await p.avaliar(`({ aberto: !$('menuConta').hidden, exp: $('botaoConta').getAttribute('aria-expanded'), itens: itensDoMenuConta().map(e => e.id),
+    ini: $('contaAvatar').textContent, nome: $('contaNome').textContent.length > 3, topo: [...document.querySelectorAll('.topo-acoes > *')].length })`);
+  conferir('menu da conta: abre com iniciais e os itens Acessibilidade, idioma, tema, Ajuda e Sair',
+    mc.aberto && mc.exp === 'true' && mc.itens.join() === 'botaoAcessibilidade,idiomaTela,botaoTema,botaoAjuda,sair' && /^[A-ZÀ-Ý]{1,2}$/.test(mc.ini) && mc.nome && mc.topo === 2, JSON.stringify(mc));
+  await captura(p, '5g_menu_conta.png');
+  await p.avaliar(`(document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' })), 0)`);
+  conferir('menu da conta: Esc fecha e o foco volta ao botão', await p.avaliar(`$('menuConta').hidden && document.activeElement?.id === 'botaoConta' && $('botaoConta').getAttribute('aria-expanded') === 'false'`));
+  await p.avaliar(`($('botaoConta').click(), document.body.click(), 0)`);
+  conferir('menu da conta: clicar fora fecha', await p.avaliar(`$('menuConta').hidden`));
   await p.avaliar(`(document.querySelector('.legenda [data-dica=vizinha]').click(), 0)`);
   conferir('dica "?": explica o termo (localidade vizinha)', await p.avaliar(`!$('dica').hidden && /Localidade vizinha/.test($('dica').textContent)`));
   // tema escuro em todas as telas: cores do Norte, fundo do mapa escuro, alvos de 44 px

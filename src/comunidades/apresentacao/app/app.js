@@ -436,7 +436,7 @@ function no(tag, props = {}, ...filhos) {
 
 function desenharTema() {
   const escuro = temaAtual() === 'escuro';
-  $('botaoTema').textContent = escuro ? t('Tema claro') : t('Tema escuro');
+  $('temaRotulo').textContent = escuro ? t('Tema claro') : t('Tema escuro');
   $('botaoTema').setAttribute('aria-pressed', String(escuro));
 }
 
@@ -455,12 +455,44 @@ function desenharTela() {
   $('telaEntrar').hidden = estado.tela !== 'entrar';
   $('telaSenha').hidden = estado.tela !== 'senha';
   $('telaApp').hidden = estado.tela !== 'app';
-  $('conta').hidden = !estado.usuario;
+  $('conta').hidden = $('contaItens').hidden = !estado.usuario;
   $('itemCalor').hidden = !estado.usuario || !pode('ver_historico');
-  if (estado.usuario) {
-    const u = estado.usuario;
-    $('contaNome').textContent = `${u.nome} · ${t(u.perfil_nome)}${u.empresa_sigla ? ' · ' + u.empresa_sigla : ''}`;
+  desenharMenuConta();
+}
+
+// o botão do menu da conta: as iniciais e o primeiro nome (ou só "Menu" antes do login) e o cabeçalho do painel
+function desenharMenuConta() {
+  const u = estado.usuario, botao = $('botaoConta');
+  botao.classList.toggle('com-usuario', !!u);
+  if (!u) {
+    $('contaRotulo').textContent = t('Menu');
+    botao.setAttribute('aria-label', t('Menu'));
+    return;
   }
+  const partes = u.nome.trim().split(/\s+/).filter(Boolean);
+  const iniciais = (partes[0]?.[0] || '') + (partes.length > 1 ? partes[partes.length - 1][0] : '');
+  $('contaAvatar').textContent = $('contaAvatarGrande').textContent = iniciais.toUpperCase();
+  $('contaRotulo').textContent = partes[0] || u.nome;
+  $('contaNome').textContent = `${u.nome} · ${t(u.perfil_nome)}${u.empresa_sigla ? ' · ' + u.empresa_sigla : ''}`;
+  botao.setAttribute('aria-label', `${t('Menu')}: ${u.nome}`);
+}
+
+// o painel do menu da conta: abre e fecha; setas movem entre os itens; Esc e o clique fora fecham
+function alternarMenuConta(aberto = $('menuConta').hidden) {
+  $('menuConta').hidden = !aberto;
+  $('botaoConta').setAttribute('aria-expanded', String(aberto));
+}
+const itensDoMenuConta = () => [...$('menuConta').querySelectorAll('button, select')].filter(e => !e.closest('[hidden]') && !e.disabled);
+function tecladoDoMenuConta(e) {
+  if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return;
+  const doBotao = e.target === $('botaoConta');
+  if (!doBotao && !e.target.closest('#menuConta')) return;
+  if (e.target.tagName === 'SELECT') return;   // as setas do seletor de idioma trocam a opção
+  e.preventDefault();
+  if (doBotao) alternarMenuConta(true);
+  const itens = itensDoMenuConta(), i = itens.indexOf(document.activeElement);
+  const n = doBotao ? 0 : (i + (e.key === 'ArrowDown' ? 1 : -1) + itens.length) % itens.length;
+  itens[n]?.focus();
 }
 
 function desenharAbas() {
@@ -3945,7 +3977,7 @@ function mudarA11y(mudanca, anuncio) {
 function abrirA11y(aberto = !estado.painelA11y) {
   estado.painelA11y = aberto;
   desenharA11y();
-  if (aberto) $('a11yTitulo').focus(); else $('botaoAcessibilidade').focus();
+  if (aberto) $('a11yTitulo').focus(); else $('botaoConta').focus();
 }
 // ler em voz alta o que está na tela (a vista aberta, ou a tela de entrar): só a voz do aparelho, nada vai ao servidor
 // só voz instalada no aparelho (localService): uma voz on-line mandaria o texto da tela a um servidor de fora
@@ -4076,7 +4108,7 @@ async function abrir() {
     if (alvo) { alvo.setAttribute('tabindex', '-1'); alvo.focus(); }
   });
   $('a11yDeclaracao').addEventListener('click', abrirDeclaracao);
-  $('declFechar').addEventListener('click', () => { $('caixaDeclaracao').hidden = true; $('botaoAcessibilidade').focus(); });
+  $('declFechar').addEventListener('click', () => { $('caixaDeclaracao').hidden = true; $('botaoConta').focus(); });
   $('formRelato').addEventListener('submit', enviarRelato);
   $('a11yLer').addEventListener('click', lerEmVozAlta);
   if ('speechSynthesis' in window) speechSynthesis.addEventListener('voiceschanged', desenharVoz);   // as vozes chegam depois
@@ -4191,17 +4223,25 @@ async function abrir() {
   $('idioma').addEventListener('change', desenharIdiomaAviso);
   $('subabas').addEventListener('click', e => { const b = e.target.closest('button[data-vista]'); if (b) irPara(b.dataset.vista); });
   $('botaoTema').addEventListener('click', alternarTema);
+  $('botaoConta').addEventListener('click', () => alternarMenuConta());
+  $('menuConta').addEventListener('click', e => {   // quem abre outra janela fecha o menu; idioma e tema ficam abertos para ver o efeito
+    const b = e.target.closest('button');
+    if (b && ['botaoAcessibilidade', 'botaoAjuda', 'sair'].includes(b.id)) alternarMenuConta(false);
+  });
+  document.addEventListener('click', e => { if (!$('menuConta').hidden && !e.target.closest('#menuConta, #botaoConta')) alternarMenuConta(false); });
+  document.addEventListener('keydown', tecladoDoMenuConta);
   $('irPara').addEventListener('change', irParaNoMapa);
   $('irPara').addEventListener('submit', e => e.preventDefault());
   $('botaoAjuda').addEventListener('click', abrirAjuda);
-  $('ajudaFechar').addEventListener('click', () => { $('caixaAjuda').hidden = true; $('botaoAjuda').focus(); });
+  $('ajudaFechar').addEventListener('click', () => { $('caixaAjuda').hidden = true; $('botaoConta').focus(); });
   document.addEventListener('click', mostrarDica);
   document.addEventListener('keydown', e => {
     if (e.key !== 'Escape') return;
     $('dica').hidden = true;
-    if (!$('caixaDeclaracao').hidden) { $('caixaDeclaracao').hidden = true; $('botaoAcessibilidade').focus(); }
+    if (!$('menuConta').hidden) { alternarMenuConta(false); $('botaoConta').focus(); }
+    else if (!$('caixaDeclaracao').hidden) { $('caixaDeclaracao').hidden = true; $('botaoConta').focus(); }
     else if (estado.painelA11y) abrirA11y(false);
-    else if (!$('caixaAjuda').hidden) { $('caixaAjuda').hidden = true; $('botaoAjuda').focus(); }
+    else if (!$('caixaAjuda').hidden) { $('caixaAjuda').hidden = true; $('botaoConta').focus(); }
     else if (estado.menuAberto) { alternarMenu(false); $('botaoMenu').focus(); }
     else if (estado.painelAmplo && estado.tela === 'app' && !e.target.closest?.('input, select, textarea')) { ampliarPainel(false); $('botaoAmpliar').focus(); }
   });

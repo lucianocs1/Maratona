@@ -158,7 +158,7 @@ await secao('Admin da empresa', async ctx => {
   const ajudaAberta = await p.avaliar(`!$('caixaAjuda').hidden && $('ajudaCorpo').textContent.length > 100`);
   await p.avaliar(`(document.activeElement.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })), 0)`);
   conferir('Ajuda: abre com o caminho do perfil e fecha com Esc (foco volta ao botão)', ajudaAberta
-    && await p.avaliar(`$('caixaAjuda').hidden && document.activeElement === $('botaoAjuda')`));
+    && await p.avaliar(`$('caixaAjuda').hidden && document.activeElement === $('botaoConta')`));
 
   // ---------- Usuários ----------
   await ir(p, 'usuarios', `document.querySelectorAll('#listaUsuarios [data-usuario]').length >= 4`);
