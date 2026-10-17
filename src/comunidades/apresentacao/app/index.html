@@ -449,27 +449,76 @@
       <label><span data-t>Estado</span> <select id="filtroUf"></select></label>
       <label><span data-t>Município</span> <select id="filtroMunicipio"></select></label>
     </form>
-    <ul class="legenda" id="legenda" aria-label="Legenda do mapa" data-t-aria-label="Legenda do mapa">
+    <ul class="legenda" id="legenda" aria-label="Camadas do mapa" data-t-aria-label="Camadas do mapa">
       <li class="legenda-topo"><button type="button" id="botaoLegenda" aria-expanded="true" aria-controls="legenda">
-        <span aria-hidden="true" class="seta">▾</span> <span id="botaoLegendaTexto">Minimizar legenda</span></button></li>
-      <li><span class="amostra inteira"></span><span data-t>Comunidade inteira</span></li>
-      <li><span class="amostra parte"></span><span data-t>Parte da comunidade</span></li>
-      <li><span class="amostra vizinha"></span><span data-t>Localidade vizinha</span> <button type="button" class="dica" data-dica="vizinha" aria-label="O que é localidade vizinha?" data-t-aria-label="O que é localidade vizinha?">?</button></li>
-      <li><span class="amostra municipio"></span><span data-t>Município afetado</span></li>
-      <li class="legenda-painel" hidden><span class="amostra painel-amostra"></span><span data-t>Mais avisos (dashboard)</span></li>
-      <li><span class="amostra outra"></span><span data-t>Outras comunidades</span></li>
-      <li class="legenda-rede">
-        <span id="legendaRede" hidden><span><span class="amostra rede"></span><span data-t>Média tensão (fictícia)</span></span>
-          <span><span class="amostra chave"></span><span data-t>Chave (fictícia)</span></span><span><span class="amostra subestacao-amostra"></span><span data-t>Subestação (fictícia)</span></span></span>
-        <button type="button" id="botaoRede" aria-pressed="true">Esconder rede fictícia</button></li>
-      <li id="itemCalor" hidden><button type="button" id="botaoCalor" aria-pressed="false">Mapa de calor (12 meses)</button>
+        <span aria-hidden="true" class="seta">▾</span> <span id="botaoLegendaTexto">Camadas</span></button></li>
+      <li class="camada aberta" id="camadaComunidades">
+        <div class="camada-cab">
+          <button type="button" role="switch" aria-checked="true" id="botaoComunidades" class="interruptor"><span class="trilho" aria-hidden="true"><span class="bola"></span></span><span data-t>Contornos das comunidades</span></button>
+          <button type="button" class="expandir" data-expandir="legendaComunidades" aria-expanded="true" aria-controls="legendaComunidades" aria-label="Mostrar ou esconder a legenda" data-t-aria-label="Mostrar ou esconder a legenda"><span aria-hidden="true" class="seta">▾</span></button>
+        </div>
+        <ul class="camada-legenda" id="legendaComunidades">
+          <li><span class="amostra inteira"></span><span data-t>Comunidade inteira</span></li>
+          <li><span class="amostra parte"></span><span data-t>Parte da comunidade</span></li>
+          <li><span class="amostra vizinha"></span><span data-t>Localidade vizinha</span> <button type="button" class="dica" data-dica="vizinha" aria-label="O que é localidade vizinha?" data-t-aria-label="O que é localidade vizinha?">?</button></li>
+          <li><span class="amostra municipio"></span><span data-t>Município afetado</span></li>
+          <li class="legenda-painel" hidden><span class="amostra painel-amostra"></span><span data-t>Mais avisos (dashboard)</span></li>
+          <li><span class="amostra outra"></span><span data-t>Outras comunidades</span></li>
+        </ul>
+        <p class="camada-dica" id="dica_botaoComunidades" role="status" hidden></p>
+      </li>
+      <li class="camada" id="camadaNomes">
+        <div class="camada-cab">
+          <button type="button" role="switch" aria-checked="true" id="botaoNomes" class="interruptor"><span class="trilho" aria-hidden="true"><span class="bola"></span></span><span data-t>Nomes dos lugares</span></button>
+        </div>
+        <p class="camada-dica" id="dica_botaoNomes" role="status" hidden></p>
+      </li>
+      <li class="camada" id="camadaRede">
+        <div class="camada-cab">
+          <button type="button" role="switch" aria-checked="true" id="botaoRede" class="interruptor"><span class="trilho" aria-hidden="true"><span class="bola"></span></span><span data-t>Rede elétrica (fictícia)</span></button>
+          <button type="button" class="expandir" data-expandir="legendaRede" aria-expanded="false" aria-controls="legendaRede" aria-label="Mostrar ou esconder a legenda" data-t-aria-label="Mostrar ou esconder a legenda"><span aria-hidden="true" class="seta">▾</span></button>
+        </div>
+        <ul class="camada-legenda" id="legendaRede">
+          <li><span class="amostra rede"></span><span data-t>Média tensão (fictícia)</span></li>
+          <li><span class="amostra chave"></span><span data-t>Chave (fictícia)</span></li>
+          <li><span class="amostra subestacao-amostra"></span><span data-t>Subestação (fictícia)</span></li>
+        </ul>
+        <p class="camada-dica" id="dica_botaoRede" role="status" hidden></p>
+      </li>
+      <li class="camada" id="camadaClientes">
+        <div class="camada-cab">
+          <button type="button" role="switch" aria-checked="false" id="botaoClientes" class="interruptor"><span class="trilho" aria-hidden="true"><span class="bola"></span></span><span data-t>Clientes (fictícios)</span></button><span class="contagem" id="contagemClientes" hidden></span>
+          <button type="button" class="expandir" data-expandir="legendaClientes" aria-expanded="false" aria-controls="legendaClientes" aria-label="Mostrar ou esconder a legenda" data-t-aria-label="Mostrar ou esconder a legenda"><span aria-hidden="true" class="seta">▾</span></button>
+        </div>
+        <ul class="camada-legenda" id="legendaClientes">
+          <li><span class="amostra cli-residencial"></span><span data-t>Residencial</span></li>
+          <li><span class="amostra cli-rural"></span><span data-t>Rural</span></li>
+          <li><span class="amostra cli-comercial"></span><span data-t>Comercial</span></li>
+          <li><span class="amostra cli-publico"></span><span data-t>Poder Público</span></li>
+          <li><span class="amostra cli-vital"></span><span data-t>Equipamento vital</span></li>
+          <li><span class="amostra cli-inativa"></span><span data-t>UC inativa</span></li>
+          <li class="legenda-densidade"><span class="escala escala-clientes" aria-hidden="true"></span><span data-t>De longe: poucos a muitos clientes por quadradinho</span></li>
+        </ul>
+        <p class="camada-dica" id="dica_botaoClientes" role="status" hidden></p>
+      </li>
+      <li class="camada" id="itemCalor" hidden>
+        <div class="camada-cab">
+          <button type="button" role="switch" aria-checked="false" id="botaoCalor" class="interruptor"><span class="trilho" aria-hidden="true"><span class="bola"></span></span><span data-t>Mapa de calor (12 meses)</span></button>
+        </div>
         <span id="legendaCalor" class="legenda-calor" hidden><span>1</span><span class="escala" aria-hidden="true"></span>
-          <span id="calorMax"></span> <span data-t>desligamento(s) por comunidade · clique numa comunidade para ver a ficha</span></span></li>
-      <li class="legenda-ucs" hidden>
-        <span><span class="amostra uc"></span><span data-t>UC da planilha</span></span>
-        <span><span class="amostra uc corrigida"></span><span data-t>UC com coordenada corrigida</span></span>
-        <span><span class="amostra uc fora"></span><span data-t>UC fora da concessão</span></span>
-        <button type="button" id="botaoUcs" aria-pressed="true">Esconder UCs</button></li>
+          <span id="calorMax"></span> <span data-t>desligamento(s) por comunidade · clique numa comunidade para ver a ficha</span></span>
+      </li>
+      <li class="camada legenda-ucs" hidden>
+        <div class="camada-cab">
+          <button type="button" role="switch" aria-checked="true" id="botaoUcs" class="interruptor"><span class="trilho" aria-hidden="true"><span class="bola"></span></span><span data-t>UCs da planilha</span></button>
+          <button type="button" class="expandir" data-expandir="legendaUcs" aria-expanded="true" aria-controls="legendaUcs" aria-label="Mostrar ou esconder a legenda" data-t-aria-label="Mostrar ou esconder a legenda"><span aria-hidden="true" class="seta">▾</span></button>
+        </div>
+        <ul class="camada-legenda" id="legendaUcs">
+          <li><span class="amostra uc"></span><span data-t>UC da planilha</span></li>
+          <li><span class="amostra uc corrigida"></span><span data-t>UC com coordenada corrigida</span></li>
+          <li><span class="amostra uc fora"></span><span data-t>UC fora da concessão</span></li>
+        </ul>
+      </li>
     </ul>
     <!-- Mapa das empresas (Admin do Norte): cada empresa liga e desliga no mapa -->
     <div class="legenda legenda-empresas" id="legendaEmpresas" hidden>

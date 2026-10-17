@@ -116,24 +116,57 @@ const ucs = readFileSync(PLANILHA, 'utf-8').split(/\r?\n/).slice(1).filter(Boole
   await p.avaliar(`(mapa.setZoom(14), 0)`);
   await ate(p, `document.documentElement.dataset.mapa === 'z14' && camadaRede`);
   const vistaRede = await p.avaliar(`({ partes: camadaRede ? camadaRede.getLayers().length : 0, legenda: !$('legendaRede').hidden,
-    botao: $('botaoRede').textContent, credito: document.querySelector('.leaflet-control-attribution').textContent.includes('OpenStreetMap'),
+    botao: $('botaoRede').getAttribute('aria-checked'), credito: document.querySelector('.leaflet-control-attribution').textContent.includes('OpenStreetMap'),
     chaves: estado.redes['3138401'].chaves.length })`);
   conferir('rede fictícia: aparece por padrão, com legenda e crédito do OSM', vistaRede.partes > 50 && vistaRede.legenda && vistaRede.credito
-    && vistaRede.botao === 'Esconder rede fictícia' && vistaRede.chaves > 10, JSON.stringify(vistaRede));
+    && vistaRede.botao === 'true' && vistaRede.chaves > 10, JSON.stringify(vistaRede));
   await captura(p, '1c_rede_ficticia.png');
   await p.avaliar(`($('botaoLegenda').click(), 0)`);
   const minimizada = await p.avaliar(`({ itens: [...document.querySelectorAll('#legenda > li')].filter(l => l.offsetParent).length,
     texto: $('botaoLegenda').textContent.trim(), expandida: $('botaoLegenda').getAttribute('aria-expanded'), altura: $('legenda').getBoundingClientRect().height })`);
   await captura(p, '1d_legenda_minimizada.png');
   await p.avaliar(`($('botaoLegenda').click(), 0)`);
-  conferir('legenda: minimiza (só o botão "Legenda") e abre de novo', minimizada.itens === 1 && /Legenda$/.test(minimizada.texto)
+  conferir('camadas: o painel minimiza (só o botão "Camadas") e abre de novo', minimizada.itens === 1 && /Camadas$/.test(minimizada.texto)
     && minimizada.expandida === 'false' && minimizada.altura < 70 && await p.avaliar(`$('botaoLegenda').getAttribute('aria-expanded') === 'true'
     && [...document.querySelectorAll('#legenda > li')].filter(l => l.offsetParent).length > 5`), JSON.stringify(minimizada));
   await p.avaliar(`($('botaoRede').click(), 0)`);
-  conferir('rede fictícia: o botão esconde (e tira o crédito)', await p.avaliar(`!camadaRede && $('legendaRede').hidden
+  conferir('rede fictícia: o interruptor esconde (e tira o crédito)', await p.avaliar(`!camadaRede && $('legendaRede').hidden
     && !document.querySelector('.leaflet-control-attribution').textContent.includes('OpenStreetMap')`));
   await p.avaliar(`($('botaoRede').click(), 0)`);
-  conferir('rede fictícia: o botão mostra de novo', await ate(p, `camadaRede && $('botaoRede').textContent === 'Esconder rede fictícia'`));
+  conferir('rede fictícia: o interruptor mostra de novo', await ate(p, `camadaRede && $('botaoRede').getAttribute('aria-checked') === 'true'`));
+  // painel de camadas: interruptores (role=switch), contagem, legenda que abre e fecha, e a camada de clientes fictícios
+  const camadas = await p.avaliar(`({ interruptores: [...document.querySelectorAll('#legenda [role=switch]')].map(b => b.id),
+    cliente: !$('camadaClientes').hidden, ligadoPadrao: $('botaoClientes').getAttribute('aria-checked'),
+    alvos: [...document.querySelectorAll('#legenda .interruptor, #legenda .expandir')].filter(e => e.offsetParent).every(e => e.getBoundingClientRect().height >= 43.5) })`);
+  conferir('camadas: interruptores de comunidades, nomes, rede, clientes, calor e UCs, com alvo de 44 px; clientes desligada por padrão',
+    camadas.interruptores.join() === 'botaoComunidades,botaoNomes,botaoRede,botaoClientes,botaoCalor,botaoUcs' && camadas.cliente && camadas.ligadoPadrao === 'false' && camadas.alvos, JSON.stringify(camadas));
+  await ate(p, `estado.resumoClientes && !$('contagemClientes').hidden`);
+  const resumo = await p.avaliar(`({ total: estado.resumoClientes.total, chip: $('contagemClientes').textContent, classes: Object.keys(estado.resumoClientes.classes).join() })`);
+  conferir('clientes fictícios: a contagem aparece ao lado do interruptor (só números)', resumo.total > 500000 && resumo.chip.replace(/\D/g, '') === String(resumo.total) && /Residencial/.test(resumo.classes), JSON.stringify(resumo));
+  await p.avaliar(`(mapa.setZoom(14), $('botaoClientes').click(), 0)`);
+  await ate(p, `camadaClientes && estado.clientesVista?.modo === 'densidade' && camadaClientes.getLayers().length > 20`);
+  conferir('clientes fictícios: de longe, quadradinhos de densidade', await p.avaliar(`estado.clientesVista.celulas.length > 20 && $('botaoClientes').getAttribute('aria-checked') === 'true'
+    && JSON.parse(localStorage.getItem('norte.camadas')).verClientes === true`));
+  await p.avaliar(`(mapa.setZoom(16), 0)`);
+  await ate(p, `estado.clientesVista?.modo === 'pontos' && camadaClientes && camadaClientes.getLayers().length > 10`);
+  const pontos = await p.avaliar(`({ n: estado.clientesVista.pontos.length, formato: estado.clientesVista.pontos.slice(0, 50).every(q => q.length === 5 && q.every(v => typeof v === 'number' || typeof v === 'boolean')),
+    texto: JSON.stringify(estado.clientesVista).match(/\d{9,}/g) })`);
+  conferir('clientes fictícios: de perto, um ponto por cliente (só latitude, longitude, classe, vital e ativa; nenhum número de UC)', pontos.n > 10 && pontos.formato && !pontos.texto, JSON.stringify(pontos));
+  await espera(700);   // o canvas do Leaflet redesenha no próximo quadro
+  const pixels = await p.avaliar(`[...document.querySelectorAll('#mapa canvas')].map(c => { const d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data;
+    let n = 0; for (let i = 3; i < d.length; i += 4) if (d[i]) n++; return [c.width, Math.round(c.getBoundingClientRect().width), n]; })`);
+  conferir('clientes fictícios: os pontos estão pintados e visíveis no canvas do mapa (largura na tela = largura do desenho)',
+    pixels.some(([w, tela, n]) => n > 500 && tela >= w / 2 - 2), JSON.stringify(pixels));
+  await captura(p, '1e_clientes_ficticios.png');
+  await p.avaliar(`($('botaoNomes').click(), 0)`);
+  conferir('camadas: o interruptor dos nomes tira os nomes do mapa', await p.avaliar(`!camadaNomes && $('botaoNomes').getAttribute('aria-checked') === 'false'`));
+  await p.avaliar(`($('botaoNomes').click(), 0)`);
+  await p.avaliar(`(document.querySelector('[data-expandir=legendaClientes]').click(), 0)`);
+  conferir('camadas: a legenda de uma camada abre e fecha (aria-expanded)', await p.avaliar(`document.querySelector('[data-expandir=legendaClientes]').getAttribute('aria-expanded') === 'true'
+    && !!document.querySelector('#legendaClientes .cli-vital')?.offsetParent`));
+  await captura(p, '1f_camadas_clientes.png');
+  await p.avaliar(`($('botaoClientes').click(), 0)`);
+  conferir('clientes fictícios: o interruptor desliga e tira a camada', await p.avaliar(`!camadaClientes && $('botaoClientes').getAttribute('aria-checked') === 'false'`));
   await p.avaliar(`(mapa.setZoom(13), 0)`);
   await ate(p, `document.documentElement.dataset.mapa === 'z13'`);
   await p.avaliar(`(mapa.setZoom(10), 0)`);
@@ -209,7 +242,7 @@ const ucs = readFileSync(PLANILHA, 'utf-8').split(/\r?\n/).slice(1).filter(Boole
   conferir('mapa: um ponto por UC válida (758), num canvas, dica sem número de UC', pts.n === 758 && pts.botao && pts.canvas && !dicaComUc.length,
     JSON.stringify({ ...pts, dicas: pts.dicas.slice(0, 2) }));
   await p.avaliar(`($('botaoUcs').click(), 0)`);
-  const escondeu = await p.avaliar(`!camadaUcs && $('botaoUcs').textContent === 'Mostrar UCs'`);
+  const escondeu = await p.avaliar(`!camadaUcs && $('botaoUcs').getAttribute('aria-checked') === 'false'`);
   await p.avaliar(`($('botaoUcs').click(), 0)`);
   conferir('botão esconde e mostra as UCs', escondeu && await p.avaliar(`camadaUcs?.getLayers().length === 758`));
   // dica da UC com HTML no nome da comunidade: vira texto, nada é executado nem carregado

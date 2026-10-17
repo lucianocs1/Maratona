@@ -48,6 +48,7 @@ from ..config import sem_acento
 from ..apresentacao import audio, copiloto, traducao
 from ..banco import acesso as banco_acesso
 from ..banco import base_territorial as banco
+from ..banco import clientes as banco_clientes
 from ..banco import rede as banco_rede
 from ..banco import radios as banco_radios
 from ..banco import relatorios as banco_relatorios
@@ -248,6 +249,32 @@ def rede(codigo: str, u: dict = Depends(usuario_atual)) -> JSONResponse:
         raise HTTPException(404, "Município fora da base da concessão.")
     # município da concessão ainda sem a rede fictícia: null (resposta normal; um 404 sujaria o console a cada movimento do mapa)
     return JSONResponse(r, headers={"Cache-Control": "private, max-age=3600"})
+
+
+def _area_dos_clientes(u: dict) -> list[str]:
+    """Os municípios cujos clientes fictícios o perfil pode ver: só os da área de atuação da empresa; o Admin do Norte
+    não vê o mapa operacional."""
+    if u["perfil"] == "admin_farol":
+        raise HTTPException(403, "Seu perfil não tem acesso a isto.")
+    return sorted(banco_acesso.area(u["empresa_id"]))
+
+
+@app.get("/api/clientes/resumo")
+def clientes_resumo(u: dict = Depends(exigir("gerar_aviso"))) -> JSONResponse:
+    """Contagens dos clientes FICTÍCIOS da área da empresa (total, por classe, vitais e inativas): só números. Só quem gera
+    aviso (o Consulta não vê pontos de cliente, como já é com as UCs da planilha)."""
+    return JSONResponse({"ficticio": True, **banco_clientes.totais(_area_dos_clientes(u))}, headers={"Cache-Control": "private, max-age=300"})
+
+
+@app.get("/api/clientes")
+def clientes(sul: float, oeste: float, norte: float, leste: float, zoom: int, u: dict = Depends(exigir("gerar_aviso"))) -> JSONResponse:
+    """Clientes FICTÍCIOS na janela do mapa: de longe a densidade em quadradinhos; de perto (zoom 15 ou mais) os pontos
+    com classe, vital e ativa. Nunca número de UC, titular ou endereço."""
+    codigos = _area_dos_clientes(u)
+    if not (-90 <= sul < norte <= 90 and -180 <= oeste < leste <= 180 and 5 <= zoom <= 20):
+        raise HTTPException(422, "Janela do mapa inválida (sul, oeste, norte, leste e zoom de 5 a 20).")
+    r = banco_clientes.consultar(codigos, sul, oeste, norte, leste, zoom)
+    return JSONResponse({"ficticio": True, **r}, headers={"Cache-Control": "private, max-age=300"})
 
 
 @app.get("/api/saude")

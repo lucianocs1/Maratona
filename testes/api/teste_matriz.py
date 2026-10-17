@@ -39,6 +39,7 @@ MATRIZ = {
     # o mapa operacional (comunidades e rede fictícia): só os perfis da empresa, e só na área de atuação dela;
     # o Admin do Norte tem o mapa das empresas (desde 15/10/2026)
     ("GET", "/api/municipios/{codigo}/comunidades"): EMPRESA, ("GET", "/api/municipios/{codigo}/rede"): EMPRESA,
+    ("GET", "/api/clientes"): GERA, ("GET", "/api/clientes/resumo"): GERA,   # clientes fictícios: só a área da empresa
     ("GET", "/api/verificar/{codigo}"): TODOS,
     # importar, conferir, gerar, PDF, MP3, JSON com UCs: Admin da empresa e Operador
     ("POST", "/api/planilha"): GERA, ("POST", "/api/avisos"): GERA, ("POST", "/api/planilha/json"): GERA,

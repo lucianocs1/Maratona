@@ -52,7 +52,12 @@ const estado = {
   painelAmplo: false,      // "Ampliar painel": o painel com ~60% da tela (preferência do usuário)
   menuAberto: false,       // celular e tablet: o menu das seções aberto pelo botão "Menu"
   verUcs: true,            // camada dos pontos das UCs (só logo depois do envio; o histórico não tem pontos)
-  verRede: true,           // rede elétrica FICTÍCIA (demonstração), de perto; o botão esconde
+  verRede: true,           // rede elétrica FICTÍCIA (demonstração), de perto; o interruptor esconde
+  verClientes: false,      // clientes FICTÍCIOS da concessão (densidade de longe, pontos de perto)
+  verNomes: true,          // nomes das comunidades e das cidades no mapa
+  verComunidades: true,    // contorno das comunidades
+  resumoClientes: null,    // /api/clientes/resumo: só contagens
+  clientesVista: null,     // o último pedido de /api/clientes (a janela do mapa)
   evidencia: null,         // comunidade clicada no mapa: { chave } (borda branca e nome em destaque); clicar de novo ou no mapa tira
   legendaMinimizada: false, // lembrada neste navegador (só conveniência)
   redes: {},               // codigo_ibge -> rede fictícia do município (null: sem rede no banco)
@@ -1976,7 +1981,7 @@ const distritoDe = (distrito, municipio) => distrito === municipio ? t('Sede') :
 function desenharBase() {
   camadaBase?.remove();
   camadaBase = null;
-  if (!mapa || mapa.getZoom() < ZOOM_COMUNIDADES) return;
+  if (!mapa || !estado.verComunidades || mapa.getZoom() < ZOOM_COMUNIDADES) return;
   const doAviso = new Set([...(estado.resultado?.municipios || []), ...(emEscolha() ? estado.leitura.base.municipios : [])].map(m => m.codigo_ibge));
   const feicoes = municipiosNaTela().filter(m => !doAviso.has(m.codigo_ibge) && estado.territorios[m.codigo_ibge])
     .flatMap(m => estado.territorios[m.codigo_ibge].features.map(f => ({ ...f, properties: { ...f.properties, municipio: m.nome,
@@ -2001,7 +2006,7 @@ function desenharNomes() {
   camadaNomes?.remove();
   camadaNomes = null;
   caixasNomes = [];
-  if (!mapa) return;
+  if (!mapa || !estado.verNomes) return;
   // com um aviso na tela, as comunidades afetadas levam o nome desde o zoom ZOOM_NOMES_AFETADAS (em destaque,
   // e primeiro na disputa por espaço); os nomes das demais só de perto
   const afetadas = new Set();
@@ -2031,7 +2036,7 @@ function desenharCidades() {
   camadaCidades?.remove();
   camadaCidades = null;
   const zoom = mapa?.getZoom();
-  if (!mapa || !camadaConcessao || zoom < ZOOM_CIDADES[0] || zoom > ZOOM_CIDADES[1]) return;
+  if (!mapa || !estado.verNomes || !camadaConcessao || zoom < ZOOM_CIDADES[0] || zoom > ZOOM_CIDADES[1]) return;
   const tela = mapa.getBounds().pad(.1), marcas = [], ocupado = [...caixasNomes];
   const area = b => (b.getNorth() - b.getSouth()) * (b.getEast() - b.getWest());
   const cidades = camadaConcessao.getLayers().map(l => ({ p: l.feature.properties, b: l.getBounds() }))
@@ -2064,8 +2069,7 @@ async function alternarCalor() {
   } catch (e) {
     if (e.status !== 401) avisar(e.message, true);
   }
-  $('botaoCalor').setAttribute('aria-pressed', String(!!estado.calor));
-  $('botaoCalor').textContent = estado.calor ? t('Esconder mapa de calor') : t('Mapa de calor (12 meses)');
+  marcarCamada('botaoCalor', !!estado.calor);
   $('legendaCalor').hidden = !estado.calor;
   $('calorMax').textContent = estado.calor ? fmt(estado.calor.maximo) : '';
   desenharBase(); desenharComunidades();
@@ -2124,9 +2128,7 @@ async function abrirFicha(latlng, municipio, nome, distrito) {
 // chaves e, mais de perto, os trafos. Só demonstração; nada de cliente.
 // o rótulo do botão da rede (também ao trocar o idioma, antes de a rede carregar)
 function desenharBotaoRede() {
-  const botao = $('botaoRede');
-  botao.textContent = estado.verRede ? t('Esconder rede fictícia') : t('Mostrar rede fictícia');
-  botao.setAttribute('aria-pressed', String(estado.verRede));
+  marcarCamada('botaoRede', estado.verRede);
 }
 
 function desenharRede() {
@@ -2162,11 +2164,126 @@ function desenharRede() {
   atribuicao.addAttribution(t(CREDITO_REDE));
 }
 
+// ---- Camadas do mapa: interruptores, legenda de cada uma e a camada de clientes (fictícios) ----
+const CAMADAS_SALVAS = ['verComunidades', 'verNomes', 'verRede', 'verClientes'];   // lembradas neste navegador (só conveniência)
+function lerCamadas() {
+  try {
+    const salvas = JSON.parse(localStorage.getItem('norte.camadas') || 'null');
+    if (salvas) for (const k of CAMADAS_SALVAS) if (typeof salvas[k] === 'boolean') estado[k] = salvas[k];
+  } catch (e) { /* sem armazenamento: valem os padrões */ }
+}
+function guardarCamadas() {
+  try { localStorage.setItem('norte.camadas', JSON.stringify(Object.fromEntries(CAMADAS_SALVAS.map(k => [k, estado[k]])))); } catch (e) { /* só nesta visita */ }
+}
+function marcarCamada(id, ligada) {
+  const botao = $(id);
+  botao.setAttribute('aria-checked', String(ligada));
+  botao.closest('li')?.classList.toggle('ligada', ligada);
+}
+const podeVerClientes = () => !!estado.usuario && pode('gerar_aviso') && !ehFarol();
+const dicaDaCamada = (id, texto) => { const e = $(`dica_${id}`); e.textContent = texto || ''; e.hidden = !texto; };
+
+function desenharCamadas() {
+  marcarCamada('botaoComunidades', estado.verComunidades);
+  marcarCamada('botaoNomes', estado.verNomes);
+  marcarCamada('botaoRede', estado.verRede);
+  marcarCamada('botaoClientes', estado.verClientes);
+  $('camadaClientes').hidden = !podeVerClientes();
+  const r = estado.resumoClientes;
+  $('contagemClientes').hidden = !r;
+  if (r) $('contagemClientes').textContent = fmt(r.total);
+  const longe = mapa && mapa.getZoom() < ZOOM_CLIENTES;
+  const v = estado.clientesVista;
+  dicaDaCamada('botaoClientes', !estado.verClientes ? '' : longe ? t('Aproxime o mapa para ver os clientes.')
+    : v?.cortado ? t('Há mais clientes aqui do que cabem na tela: aproxime mais.') : '');
+}
+
+function alternarCamada(chave, depois) {
+  estado[chave] = !estado[chave];
+  guardarCamadas();
+  desenharCamadas();
+  depois?.();
+}
+function expandirCamada(botao) {
+  const li = botao.closest('li'), aberta = !li.classList.contains('aberta');
+  li.classList.toggle('aberta', aberta);
+  botao.setAttribute('aria-expanded', String(aberta));
+}
+
+const COR_CLASSE = ['#4F8FF7', '#3DB86B', '#B07CFF', '#F472B6'];   // residencial, rural, comercial, poder público
+const ESCALA_DENSIDADE = ['#8FD3FF', '#38A1F5', '#2F6BE0', '#4B2FB8'];
+const ZOOM_CLIENTES = 8;
+let camadaClientes, telaClientes, chaveClientes = null, pedidoClientes = 0, tempoClientes;
+
+function limparClientes() {
+  camadaClientes?.remove();
+  camadaClientes = null;
+}
+
+// a janela do mapa vira um pedido a /api/clientes; o resultado mais novo vence
+async function buscarClientes() {
+  if (!estado.verClientes || !mapa || estado.tela !== 'app' || !podeVerClientes()) return limparClientes();
+  const zoom = Math.round(mapa.getZoom());
+  if (zoom < ZOOM_CLIENTES) { estado.clientesVista = null; chaveClientes = null; limparClientes(); return desenharCamadas(); }
+  const b = mapa.getBounds().pad(.15), q = { sul: b.getSouth().toFixed(4), oeste: b.getWest().toFixed(4), norte: b.getNorth().toFixed(4), leste: b.getEast().toFixed(4), zoom };
+  const chave = JSON.stringify(q);
+  if (chave === chaveClientes) return;
+  const meu = ++pedidoClientes;
+  try {
+    const r = await api(`/api/clientes?${consulta(q)}`);
+    if (meu !== pedidoClientes) return;   // a janela já mudou
+    estado.clientesVista = r;
+    chaveClientes = chave;
+  } catch (e) {
+    return;   // tenta de novo no próximo movimento
+  }
+  desenharClientes();
+}
+const agendarClientes = () => { clearTimeout(tempoClientes); tempoClientes = setTimeout(buscarClientes, 300); };
+
+// de longe: quadradinhos de densidade; de perto: um ponto por cliente (vital com contorno, inativa vazada)
+function desenharClientes() {
+  limparClientes();
+  desenharCamadas();
+  const r = estado.clientesVista;
+  if (!mapa || !estado.verClientes || !r || mapa.getZoom() < ZOOM_CLIENTES) return;
+  telaClientes ||= L.canvas({ padding: .3 });
+  const partes = [];
+  if (r.modo === 'pontos') {
+    const z = mapa.getZoom(), raio = z >= 18 ? 4.6 : z >= 17 ? 3.6 : z >= 16 ? 2.6 : 1.8, contorno = escuro() ? '#FFFFFF' : '#0B1B2B';
+    for (const [lat, lon, classe, vital, ativa] of r.pontos)
+      partes.push(L.circleMarker([lat, lon], { renderer: telaClientes, radius: vital ? raio + 2.5 : raio, weight: vital ? 2 : 0.8,
+        color: vital ? contorno : COR_CLASSE[classe - 1], fillColor: COR_CLASSE[classe - 1], fillOpacity: ativa ? .9 : .15, interactive: false }));
+  } else {
+    const h = r.lado / 2, topo = Math.log(1 + Math.max(1, ...r.celulas.map(c => c[2])));
+    for (const [lat, lon, n] of r.celulas)
+      partes.push(L.rectangle([[lat - h, lon - h], [lat + h, lon + h]], { renderer: telaClientes, stroke: false, interactive: false,
+        fillColor: ESCALA_DENSIDADE[Math.min(3, Math.floor(Math.log(1 + n) / topo * 4 - 1e-9))], fillOpacity: .6 }));
+  }
+  camadaClientes = L.layerGroup(partes).addTo(mapa);
+}
+
+async function alternarClientes() {
+  estado.verClientes = !estado.verClientes;
+  guardarCamadas();
+  chaveClientes = null;
+  desenharCamadas();
+  if (!estado.verClientes) { limparClientes(); return; }
+  await buscarClientes();
+}
+
+// só as contagens (total, vitais, inativas e por classe): o número que aparece ao lado do interruptor
+async function carregarResumoClientes() {
+  if (!podeVerClientes()) return;
+  try { estado.resumoClientes = await api('/api/clientes/resumo'); } catch (e) { return; }
+  desenharCamadas();
+}
+
 function desenharLegenda() {
   const min = estado.legendaMinimizada;
   $('legenda').classList.toggle('minimizada', min);
   $('botaoLegenda').setAttribute('aria-expanded', String(!min));
-  $('botaoLegendaTexto').textContent = min ? t('Legenda') : t('Minimizar legenda');
+  $('botaoLegendaTexto').textContent = t('Camadas');
   $('botaoLegenda').querySelector('.seta').textContent = min ? '▸' : '▾';
 }
 
@@ -2196,6 +2313,8 @@ async function buscarNaTela() {
 }
 
 async function aoMoverMapa() {
+  agendarClientes();
+  desenharCamadas();
   if (mapa.getZoom() >= ZOOM_COMUNIDADES && estado.tela === 'app' && !ehFarol()) await buscarNaTela();
   desenharBase(); desenharNomes(); desenharCidades(); desenharRede();
   document.documentElement.dataset.mapa = `z${mapa.getZoom()}`;
@@ -2203,6 +2322,7 @@ async function aoMoverMapa() {
 
 async function alternarRede() {
   estado.verRede = !estado.verRede;
+  guardarCamadas();
   desenharRede();
   if (estado.verRede && mapa.getZoom() >= ZOOM_COMUNIDADES) { await buscarNaTela(); desenharRede(); }
   else if (estado.verRede) avisar(t('A rede fictícia aparece de perto: aproxime num município (ou clique nele).'));
@@ -2264,7 +2384,7 @@ function desenharComunidades() {
   camadaComunidades?.remove();
   camadaComunidades = null;
   const r = estado.resultado;
-  if (!r || naEscolha()) return;   // no passo 3, o mapa é o da escolha (desenharMapaEscolha)
+  if (!r || naEscolha() || !estado.verComunidades) return;   // no passo 3, o mapa é o da escolha (desenharMapaEscolha)
   // as afetadas preenchidas; as outras comunidades dos mesmos municípios só com o contorno, por baixo
   const feicoes = [], outras = [];
   for (const m of r.municipios) {
@@ -2306,8 +2426,7 @@ function desenharUcs() {
   camadaUcs = null;
   const r = estado.resultado, botao = $('botaoUcs');
   botao.closest('li').hidden = !temPontos() || naEscolha();
-  botao.textContent = estado.verUcs ? t('Esconder UCs') : t('Mostrar UCs');
-  botao.setAttribute('aria-pressed', String(estado.verUcs));
+  marcarCamada('botaoUcs', estado.verUcs);
   if (!temPontos() || !estado.verUcs || naEscolha()) return;
   telaUcs ||= L.canvas({ padding: .3 });
   const ponto = (lat, lon, cor, dica) => L.circleMarker([lat, lon], { renderer: telaUcs, radius: 3.5, weight: 1, color: '#FFFFFF', fillColor: cor, fillOpacity: .95 })
@@ -2602,7 +2721,9 @@ async function abrirApp() {
   $('tipoOutro').maxLength = estado.config.max_outro;
   desenharConcessao();
   desenharIrPara();
-  $('botaoCalor').textContent = estado.calor ? t('Esconder mapa de calor') : t('Mapa de calor (12 meses)');
+  carregarResumoClientes();
+  desenharCamadas();
+  if (estado.verClientes) agendarClientes();
   atribuicao?.setPrefix(t('Concessão e comunidades: IBGE · Leaflet'));
   if (ehFarol()) {
     await carregarMapaEmpresas();
@@ -2702,7 +2823,8 @@ function limparTela() {
   mapa?.closePopup();
   $('textoPergunta').value = ''; $('perguntaPainel').hidden = true;
   $('precoSpot').value = ''; $('veiculacoes').value = ''; $('custoRadio').hidden = true;
-  $('legendaCalor').hidden = true; $('botaoCalor').setAttribute('aria-pressed', 'false'); $('botaoCalor').textContent = t('Mapa de calor (12 meses)');
+  $('legendaCalor').hidden = true; marcarCamada('botaoCalor', false);
+  Object.assign(estado, { resumoClientes: null, clientesVista: null }); chaveClientes = null; camadaClientes?.remove(); camadaClientes = null; desenharCamadas();
   $('dica').hidden = true;
   $('arquivo').value = '';
   $('buscaHistorico').value = ''; $('periodoHistorico').value = '';
@@ -3934,7 +4056,6 @@ async function trocarIdioma(novo, salvar = true) {
   try { estado.config = await api('/api/config'); } catch (e) { return; }   // os tipos no idioma novo
   $('faixa').textContent = t(estado.config.aviso_ficticio);
   desenharTipos(); desenharIdiomaAviso(); desenharRede(); desenharUcs(); desenharIrPara();
-  $('botaoCalor').textContent = estado.calor ? t('Esconder mapa de calor') : t('Mapa de calor (12 meses)');
   atribuicao?.setPrefix(t('Concessão e comunidades: IBGE · Leaflet'));
   for (const id of ['relMes', 'audMes', 'simPeriodo']) $(id).replaceChildren();   // os meses no formato do idioma
   if (estado.resultado) desenharResultado();
@@ -4139,10 +4260,16 @@ async function abrir() {
   $('form').addEventListener('submit', enviar);
   $('botaoUcs').addEventListener('click', () => { estado.verUcs = !estado.verUcs; desenharUcs(); });
   $('botaoRede').addEventListener('click', alternarRede);
+  $('botaoClientes').addEventListener('click', alternarClientes);
+  $('botaoNomes').addEventListener('click', () => alternarCamada('verNomes', () => { desenharNomes(); desenharCidades(); }));
+  $('botaoComunidades').addEventListener('click', () => alternarCamada('verComunidades', () => { desenharBase(); desenharComunidades(); desenharNomes(); }));
+  $('legenda').addEventListener('click', e => { const b = e.target.closest('[data-expandir]'); if (b) expandirCamada(b); });
   $('botaoCalor').addEventListener('click', alternarCalor);
   $('botaoLegenda').addEventListener('click', alternarLegenda);
   try { estado.legendaMinimizada = localStorage.getItem('farol.legenda') === 'minimizada'; } catch (e) { /* sem armazenamento */ }
+  lerCamadas();
   desenharLegenda();
+  desenharCamadas();
   $('funil').addEventListener('click', e => { const b = e.target.closest('button[data-passo]'); if (b && !b.disabled) irParaPasso(Number(b.dataset.passo)); });
   $('avancar').addEventListener('click', () => irParaPasso(2));
   $('voltar').addEventListener('click', () => irParaPasso(1));

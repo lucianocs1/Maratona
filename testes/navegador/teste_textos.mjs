@@ -41,15 +41,15 @@ for (const nome of ['MENUS', 'RELATORIOS', 'AJUDA', 'DICAS', 'COBRANCA', 'CANAL'
 }
 for (const c of ['SEM_CONEXAO', 'ERRO_SERVIDOR', 'CREDITO_REDE']) chaves.add(desfaz(new RegExp(`const ${c} = '((?:[^'\\\\]|\\\\.)*)'`).exec(js)[1]));
 // 3. o index.html: o texto dos elementos com data-t e os atributos data-t-*
-for (const m of html.matchAll(/<(\w+)[^>]*\sdata-t(?:\s|>)[^>]*>([^<]*)</g)) chaves.add(m[2].trim().replace(/\s+/g, ' '));
+for (const m of html.matchAll(/<(\w+)[^>]*\sdata-t(?=[\s>])[^>]*>([^<]*)</g)) chaves.add(m[2].trim().replace(/\s+/g, ' '));
 for (const m of html.matchAll(/data-t-(?:placeholder|aria-label)="([^"]*)"/g)) chaves.add(m[1]);
 chaves.delete('');
 for (const fixos of ['UC', 'Norte', 'WhatsApp', '{n} s', '{nome} ({kb} KB)']) chaves.add(fixos);
 
 const faltando = { en: [], es: [] };
 for (const k of chaves) for (const i of ['en', 'es']) if (!(k in TEXTOS[i])) faltando[i].push(k);
-conferir(`${chaves.size} textos da tela: nenhum sem tradução em inglês`, !faltando.en.length, JSON.stringify(faltando.en.slice(0, 15)));
-conferir('nenhum sem tradução em espanhol', !faltando.es.length, JSON.stringify(faltando.es.slice(0, 15)));
+conferir(`${chaves.size} textos da tela: nenhum sem tradução em inglês`, !faltando.en.length, JSON.stringify(faltando.en.slice(0, 60)));
+conferir('nenhum sem tradução em espanhol', !faltando.es.length, JSON.stringify(faltando.es.slice(0, 60)));
 const chavesEn = Object.keys(TEXTOS.en), chavesEs = Object.keys(TEXTOS.es);
 conferir('inglês e espanhol com as mesmas chaves', chavesEn.length === chavesEs.length && chavesEn.every(k => k in TEXTOS.es),
   JSON.stringify(chavesEn.filter(k => !(k in TEXTOS.es)).slice(0, 5)));

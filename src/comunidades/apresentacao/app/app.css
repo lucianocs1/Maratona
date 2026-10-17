@@ -188,13 +188,43 @@ button.prim:hover:not(:disabled) { filter: none; background: #F0A928; }
   background: color-mix(in srgb, var(--sup) 94%, transparent); border: 1px solid var(--linha); box-shadow: var(--sombra); }
 .ir-para label { display: grid; gap: 2px; font-size: 0.75rem; }
 .ir-para select { min-width: 120px; }
-.legenda li.legenda-ucs { display: grid; gap: 6px; margin-top: 4px; padding-top: 8px; border-top: 1px solid var(--linha); }
-.legenda-ucs > span { display: flex; align-items: center; gap: 8px; }
-.legenda li.legenda-rede { display: grid; gap: 6px; margin-top: 4px; padding-top: 8px; border-top: 1px solid var(--linha); }
-#legendaRede { display: grid; gap: 6px; }
-#legendaRede > span { display: flex; align-items: center; gap: 8px; }
+/* enquanto se desenha a área da escolha (passo 3), o painel de camadas sai da frente: ele cobriria um canto do mapa */
+.mapa-area:has(#mapa.desenhando) .legenda { display: none; }
+/* Painel de camadas: cada camada tem um interruptor, a contagem e, se tiver, a legenda que abre e fecha */
+.legenda { width: min(340px, calc(100% - 24px)); }
+.legenda li.camada { display: grid; gap: 2px; padding-top: 2px; border-top: 1px solid var(--linha); }
+.legenda li.camada[hidden] { display: none; }
+.camada-cab { display: flex; align-items: center; gap: 4px; }
+.interruptor { flex: 1; min-width: 0; display: flex; align-items: center; gap: 10px; min-height: 44px; padding: 0 4px; border: 0; border-radius: 10px;
+  background: transparent; color: var(--texto); font-size: 0.875rem; font-weight: 600; text-align: left; }
+.interruptor:hover { background: var(--sup2); }
+.trilho { position: relative; width: 40px; height: 22px; flex: none; border-radius: 999px; background: var(--borda-campo); transition: background .15s; }
+.bola { position: absolute; top: 2px; left: 2px; width: 18px; height: 18px; border-radius: 50%; background: #FFFFFF; box-shadow: 0 1px 3px rgba(0, 0, 0, .4); transition: transform .15s; }
+.interruptor[aria-checked="true"] .trilho { background: var(--acento); }
+.interruptor[aria-checked="true"] .bola { transform: translateX(18px); }
+.expandir { width: 44px; min-width: 44px; padding: 0; border: 0; background: transparent; color: var(--texto2); }
+.expandir:hover { background: var(--sup2); }
+.expandir .seta { display: inline-block; font-size: 1.25rem; line-height: 1; transition: transform .15s; }
+.camada:not(.aberta) .expandir .seta { transform: rotate(-90deg); }
+.contagem { flex: none; padding: 1px 8px; border-radius: 999px; background: var(--sup2); color: var(--texto2); font-size: 0.75rem; font-variant-numeric: tabular-nums; }
+.contagem[hidden] { display: none; }
+.camada-legenda { list-style: none; margin: 0; padding: 0 0 8px 50px; display: grid; gap: 6px; }
+.legenda li.camada .camada-legenda li { display: flex; align-items: center; gap: 8px; }
+.camada:not(.aberta) > .camada-legenda, .camada:has(.interruptor[aria-checked="false"]) > .camada-legenda { display: none; }
+.camada-dica { margin: 0; padding: 0 8px 8px 54px; font-size: 0.75rem; color: var(--texto2); }
+.camada-dica[hidden] { display: none; }
+.legenda li.camada > .legenda-calor { padding: 0 8px 8px 54px; }
 .amostra.chave, .amostra.subestacao-amostra { margin: 0 4px; }
-#legendaRede[hidden] { display: none; }
+.amostra.cli-residencial, .amostra.cli-rural, .amostra.cli-comercial, .amostra.cli-publico, .amostra.cli-vital, .amostra.cli-inativa {
+  width: 10px; height: 10px; margin: 0 4px; border-radius: 50%; border: 1px solid transparent; }
+.amostra.cli-residencial { background: #4F8FF7; }
+.amostra.cli-rural { background: #3DB86B; }
+.amostra.cli-comercial { background: #B07CFF; }
+.amostra.cli-publico { background: #F472B6; }
+.amostra.cli-vital { width: 14px; height: 14px; margin: 0 2px; background: #4F8FF7; border: 2px solid var(--texto); }
+.amostra.cli-inativa { background: transparent; border: 1.5px solid #4F8FF7; }
+.escala-clientes { width: 54px; height: 10px; flex: none; border-radius: 4px; border: 1px solid var(--linha);
+  background: linear-gradient(90deg, #8FD3FF, #38A1F5, #2F6BE0, #4B2FB8); }
 .amostra.rede { width: 18px; height: 0; border-radius: 0; border-top: 2.5px solid var(--info); }
 .amostra.chave { width: 10px; height: 10px; border-radius: 50%; background: var(--info); border: 1.5px solid #FFFFFF; box-shadow: 0 0 0 1px #93A1AF; }
 .amostra.subestacao-amostra, .subestacao span { display: block; width: 12px; height: 12px; background: var(--noite); border: 2px solid var(--ambar); transform: rotate(45deg); }
@@ -568,6 +598,8 @@ button.dica:hover { background: radial-gradient(circle at center, var(--acento) 
 .botao-menu { display: none; }
 .menu-atual { font-weight: 400; color: var(--texto2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
 img, video, canvas { max-width: 100%; }
+/* os canvas do Leaflet (UCs, transformadores, clientes) ficam num painel de largura zero: sem isto o max-width os espreme e somem */
+.leaflet-container canvas { max-width: none; max-height: none; }
 /* o painel é um container (as tabelas viram cartões quando ELE é estreito, não a tela); a palavra só quebra se não couber
    sozinha na linha (anywhere deixava as tabelas encolherem até uma letra por linha) */
 .painel { overflow-wrap: break-word; container: painel / inline-size; position: relative; }   /* o que é escondido (absolute) fica dentro do painel, não estica a página */
@@ -627,6 +659,8 @@ img, video, canvas { max-width: 100%; }
   button, select, summary, .check, .confirmar, .arquivo,
   input:not([type=checkbox]):not([type=radio]):not([type=file]) { min-height: 48px; }
   button.dica { min-width: 48px; min-height: 48px; }
+  .interruptor, .expandir, .menu-item { min-height: 48px; }
+  .expandir { min-width: 48px; }
   #mapa .leaflet-bar a, #mapa .leaflet-bar a:hover { width: 48px; height: 48px; line-height: 48px; }
   .tocador audio { height: 48px; }
 }

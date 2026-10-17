@@ -28,6 +28,7 @@ VISTAS = {
     "/api/auditoria/verificar", "/api/empresa/configuracao", "/api/radios", "/api/radios/pedidos", "/api/historico", "/api/historico/{id_}",
     "/api/historico/{id_}/radios", "/api/historico/{id_}/envios", "/api/historico/{id_}/comprovante", "/api/historico/{id_}/linha-do-tempo",
     "/api/painel", "/api/verificar/{codigo}", "/api/municipios/{codigo}/comunidades", "/api/municipios/{codigo}/rede",
+    "/api/clientes", "/api/clientes/resumo",
     "/api/relatorios/vias", "/api/comunidades/ficha", "/api/comunidades/calor", "/confirmar/{token}",
     "/api/empresas/mapa", "/api/empresas/{id_}/ficha", "/api/municipios-ibge", "/api/municipios-ibge/{uf}/mapa",
 }
