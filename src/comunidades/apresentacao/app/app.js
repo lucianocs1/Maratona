@@ -456,6 +456,7 @@ function desenharTela() {
   $('telaSenha').hidden = estado.tela !== 'senha';
   $('telaApp').hidden = estado.tela !== 'app';
   $('conta').hidden = $('contaItens').hidden = !estado.usuario;
+  $('faixa').hidden = estado.tela === 'app';   // a faixa de demonstração fica na entrada; dentro do app o aviso está em Ajuda
   $('itemCalor').hidden = !estado.usuario || !pode('ver_historico');
   desenharMenuConta();
 }
