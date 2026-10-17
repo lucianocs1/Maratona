@@ -48,8 +48,14 @@ def _fala_es(t: str) -> str:
     return re.sub(r"\b(\d{1,2}):(\d{2})\b", lambda m: f"{m.group(1)} y {int(m.group(2))}", t)   # 14:30 -> 14 y 30
 
 
+def sem_marcacao(texto: str) -> str:
+    """Tira as marcas de Markdown (asteriscos, #, crase, til e sublinhado de ênfase): a voz as leria ou faria uma pausa."""
+    t = re.sub(r"[*#`~]+", "", str(texto))
+    return re.sub(r"(?<!\w)_+|_+(?!\w)", "", t)
+
+
 def texto_para_fala(texto: str, idioma: str = "pt-BR") -> str:
-    t = " ".join(str(texto).split())
+    t = " ".join(sem_marcacao(texto).split())
     if idioma == "en":
         return _fala_en(t)
     if idioma == "es":

@@ -41,6 +41,7 @@ casos = {
     "aviso nº 12": "aviso número 12",
     "33/13 fica como está": "33/13 fica como está",
 }
+assert texto_para_fala("*Desligamento* programado: **8h** às `14h`, _sem_ luz #1") == "Desligamento programado: 8 horas às 14 horas, sem luz 1"
 erradas = {k: texto_para_fala(k) for k, v in casos.items() if texto_para_fala(k) != v}
 conferir("locução: horas, datas e abreviações como o locutor diria", not erradas, str(erradas))
 
