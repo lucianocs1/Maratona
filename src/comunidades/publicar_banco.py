@@ -61,6 +61,7 @@ def publicar() -> int:
             cur.execute(microrregioes.ESQUEMA)
             cur.execute(municipios_ibge.ESQUEMA)
             cur.execute("TRUNCATE " + ", ".join(TABELAS))
+        dst.commit()   # libera o espaço da base antiga antes de carregar: o plano gratuito do Neon (512 MB) não comporta as duas juntas
         for t in TABELAS:
             with origem.cursor() as co, dst.cursor() as cd:
                 cols = ", ".join(_colunas(co, t))
@@ -73,7 +74,7 @@ def publicar() -> int:
                 n_destino = cd.fetchone()[0]
             print(f"  {t}: {n_destino:,} linhas".replace(",", "."), flush=True)
             if n_origem != n_destino:
-                raise SystemExit(f"{t}: {n_origem} na origem e {n_destino} no destino; nada foi gravado.")
+                raise SystemExit(f"{t}: {n_origem} na origem e {n_destino} no destino; a base de produção ficou incompleta; rode de novo.")
         dst.commit()
     with psycopg.connect(url, autocommit=True) as dst:
         dst.execute("ANALYZE")
