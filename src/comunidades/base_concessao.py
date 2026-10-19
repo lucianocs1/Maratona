@@ -97,6 +97,8 @@ def executar(argv: list[str]) -> int:
         acerto = " | ".join(f"{z.lower()} {d['acerto']:.1%} ({d['enderecos']})" for z, d in v.items())
         print(f"{rotulo}: {res['enderecos']} endereços, {res['comunidades']} comunidades | acerto {acerto} | "
               f"{time.time() - t0:.0f} s", flush=True)
+    from . import unificar_homonimos   # sede e seu começo viram uma comunidade só (idempotente)
+    unificar_homonimos.main([])
     banco.colorir_mapa()
     print(f"\nNo banco:{len(banco.municipios_gravados())} de {len(ms)} municípios. Falhas nesta rodada: {len(falhas)}")
     for rotulo, erro in falhas:

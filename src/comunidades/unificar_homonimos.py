@@ -6,12 +6,32 @@ pedaço com mais endereços, a contagem é a soma e os endereços de referência
 depois de rodar, refaça o desenho com `uv run python -m comunidades.territorio_concessao` e reinicie a API.
 O base_concessao já grava assim (fontes/base_territorial.py não separa mais os homônimos).
 
+Também une a comunidade que é o começo do nome da sede do distrito ("Aracati" e "Aracati de Minas"; eh_sede_do_curto).
+
 Uso: uv run python -m comunidades.unificar_homonimos [--so cod1,cod2]
 """
 
+import re
 import sys
+import unicodedata
 
 from .banco.conexao import conectar
+
+
+def _norm(s: str) -> str:
+    return re.sub(r"\s+", " ", unicodedata.normalize("NFKD", s).encode("ascii", "ignore").decode().lower()).strip()
+
+
+def eh_sede_do_curto(longo: str, curto: str, distrito: str, municipio: str) -> bool:
+    """O nome longo é o da "sede" e o curto é o começo dele ("Aracati" e "Aracati de Minas"): vale quando o longo é o
+    nome do próprio distrito ou o curto mais "de/do/da" e o distrito ou o município. Só isso: "Antônio" e "Antônio
+    Garoni", "Barra" e "Barra dos Couto" ou "Jardim" e "Jardim Bandeirantes" são lugares diferentes e ficam separados."""
+    nl, nc = _norm(longo), _norm(curto)
+    if not nl.startswith(nc + " "):
+        return False
+    alvos = {_norm(distrito), _norm(municipio)}
+    resto = nl[len(nc) + 1:]
+    return nl in alvos or any(resto == f"{p} {x}" for x in alvos for p in ("de", "do", "da"))
 
 
 def _base(nome: str, distrito: str) -> str:
@@ -40,6 +60,24 @@ def unificar(cur, cod: str) -> tuple[int, int]:
         cur.execute("UPDATE municipio SET comunidades = (SELECT count(*) FROM comunidade WHERE codigo_ibge = %s) WHERE codigo_ibge = %s", (cod, cod))
         unidos += 1
         sumiram += len(perdem)
+    # sede e seu começo ("Aracati" + "Aracati de Minas"), no mesmo distrito: uma só, com o nome mais completo
+    cur.execute("SELECT nome FROM municipio WHERE codigo_ibge = %s", (cod,))
+    nome_mun = cur.fetchone()[0]
+    cur.execute("SELECT nome, distrito, enderecos FROM comunidade WHERE codigo_ibge = %s", (cod,))
+    todas = cur.fetchall()
+    for longo, dist_l, n_l in todas:
+        for curto, dist_c, n_c in todas:
+            if curto == longo or dist_c != dist_l or not eh_sede_do_curto(longo, curto, dist_l or "", nome_mun):
+                continue
+            cur.execute("SELECT 1 FROM comunidade WHERE codigo_ibge = %s AND nome = %s", (cod, curto))
+            if not cur.fetchone():
+                continue   # já absorvida numa volta anterior
+            cur.execute("UPDATE endereco_referencia SET comunidade = %s WHERE codigo_ibge = %s AND comunidade = %s", (longo, cod, curto))
+            cur.execute("DELETE FROM comunidade WHERE codigo_ibge = %s AND nome = %s", (cod, curto))
+            cur.execute("UPDATE comunidade SET enderecos = enderecos + %s WHERE codigo_ibge = %s AND nome = %s", (n_c, cod, longo))
+            unidos += 1
+            sumiram += 1
+    cur.execute("UPDATE municipio SET comunidades = (SELECT count(*) FROM comunidade WHERE codigo_ibge = %s) WHERE codigo_ibge = %s", (cod, cod))
     return unidos, sumiram
 
 
