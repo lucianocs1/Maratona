@@ -33,7 +33,7 @@ def _um_municipio() -> None:
     from .banco import base_territorial as banco
     from .fontes import base_territorial as BT
     from .fontes import dados, grafia, ibge
-    from .nucleo.algoritmo import territorios_voronoi
+    from .nucleo.algoritmo import territorios_cobrindo
     from .validacao.planilha import amostra_separada
 
     dados.garantir()
@@ -45,12 +45,10 @@ def _um_municipio() -> None:
     a = amostra_separada(e)
     validacao = {z: {"acerto": round(float(r.ACERTO), 3), "enderecos": int(r.ENDERECOS)} for z, r in a.iterrows()}
 
-    # território de cada comunidade (só para desenho): células de ~150 m no lugar dos transformadores
+    # território de cada comunidade (só para desenho): cobre o município inteiro (Voronoi de células de ~150 m)
     mun = gpd.read_file(C.INTERIM / "municipio.gpkg")
-    m = e.to_crs(C.CRS_METRICO)
-    celula = ((m.geometry.x // CELULA_TERRITORIO_M).astype(int).astype(str) + "_"
-              + (m.geometry.y // CELULA_TERRITORIO_M).astype(int).astype(str))
-    t = territorios_voronoi(m.assign(COD_TRAFO=celula), "COMUNIDADE", mun.to_crs(C.CRS_METRICO).union_all())
+    t = territorios_cobrindo(e.to_crs(C.CRS_METRICO), "COMUNIDADE", mun.to_crs(C.CRS_METRICO).union_all(),
+                                CELULA_TERRITORIO_M)
     eg = e.to_crs(C.CRS_GEO)
     dentro = float(os.environ["FAROL_DENTRO"]) if os.environ.get("FAROL_DENTRO") else None
     banco.gravar_municipio(C.COD_MUNICIPIO, C.NOME_MUNICIPIO, C.UF, dentro, mun.to_crs(C.CRS_GEO).union_all(),
@@ -99,7 +97,8 @@ def executar(argv: list[str]) -> int:
         acerto = " | ".join(f"{z.lower()} {d['acerto']:.1%} ({d['enderecos']})" for z, d in v.items())
         print(f"{rotulo}: {res['enderecos']} endereços, {res['comunidades']} comunidades | acerto {acerto} | "
               f"{time.time() - t0:.0f} s", flush=True)
-    print(f"\nNo banco: {len(banco.municipios_gravados())} de {len(ms)} municípios. Falhas nesta rodada: {len(falhas)}")
+    banco.colorir_mapa()
+    print(f"\nNo banco:{len(banco.municipios_gravados())} de {len(ms)} municípios. Falhas nesta rodada: {len(falhas)}")
     for rotulo, erro in falhas:
         print(f"  {rotulo}: {erro}")
     return 1 if falhas else 0

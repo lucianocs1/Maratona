@@ -32,6 +32,7 @@ from pathlib import Path
 
 RAIZ = Path(__file__).resolve().parents[2]
 SMTP, WEB = 1125, 8125
+os.environ["FAROL_EMAIL"] = "smtp"   # o .env pode ter "demo"; aqui o envio é de verdade, para o Mailpit
 os.environ.update({"FAROL_ESQUEMA": "teste_radio", "FAROL_SMTP_HOST": "127.0.0.1", "FAROL_SMTP_PORTA": str(SMTP),
                    "FAROL_SMTP_SEGURANCA": "nenhuma", "FAROL_SMTP_REMETENTE": "Norte <avisos@farol.example>",
                    "FAROL_URL_PUBLICA": "http://farol.teste",
@@ -69,14 +70,22 @@ def sql(q, args=()):
 V = {"distribuidora": "Distribuidora EMG", "municipio": "Leopoldina", "data": "20/11", "inicio": "8h", "fim": "14h",
      "motivo": "poda de árvores perto da rede", "comunidades": "Graminha e Boa Sorte", "comunidades_parciais": "Tomé Nogueira",
      "telefone_atendimento": "0800 701 0102", "codigo": "FRL-AAAA-BBBB-CCCC"}
-conferir("mensagem: o modelo padrão com todos os campos", M.montar(M.PADRAO, V) ==
+# o modelo antigo (até 18/10/2026) serve para provar o mecanismo: todos os campos, trechos opcionais que somem
+MODELO_ANTIGO = ("Atenção, ouvintes. A {distribuidora} informa: no dia {data}, das {inicio} às {fim}, haverá desligamento "
+                 "programado de energia para {motivo}[ nas comunidades {comunidades}].[ Ficará sem energia parte de: "
+                 "{comunidades_parciais}.] Programe-se.[ Dúvidas: {telefone_atendimento}.]")
+conferir("mensagem: o modelo padrão da Energisa (desde 18/10/2026)", M.montar(M.PADRAO, V) ==
+         "Pessoal de Leopoldina, no dia 20/11, das 8h às 14h, vamos precisar desligar a energia da sua região para poda de árvores perto da rede. "
+         "Comunidades: Graminha e Boa Sorte. Parte de: Tomé Nogueira. Não esqueça de tirar os aparelhos da tomada. "
+         "Qualquer dúvida, entre em contato pelo site, WhatsApp ou app.", M.montar(M.PADRAO, V))
+conferir("mensagem: um modelo com todos os campos", M.montar(MODELO_ANTIGO, V) ==
          "Atenção, ouvintes. A Distribuidora EMG informa: no dia 20/11, das 8h às 14h, haverá desligamento programado de energia "
          "para poda de árvores perto da rede nas comunidades Graminha e Boa Sorte. Ficará sem energia parte de: Tomé Nogueira. "
-         "Programe-se. Dúvidas: 0800 701 0102.", M.montar(M.PADRAO, V))
-sem = M.montar(M.PADRAO, {**V, "telefone_atendimento": "", "comunidades_parciais": ""})
+         "Programe-se. Dúvidas: 0800 701 0102.", M.montar(MODELO_ANTIGO, V))
+sem = M.montar(MODELO_ANTIGO, {**V, "telefone_atendimento": "", "comunidades_parciais": ""})
 conferir("mensagem: trechos opcionais com campo vazio somem inteiros", "Dúvidas" not in sem and "parte de" not in sem
          and sem.endswith("Programe-se."), sem)
-so_parciais = M.montar(M.PADRAO, {**V, "comunidades": ""})
+so_parciais = M.montar(MODELO_ANTIGO, {**V, "comunidades": ""})
 conferir("mensagem: sem comunidade inteira, some o 'nas comunidades'", "nas comunidades" not in so_parciais
          and "rede. Ficará sem energia parte de: Tomé Nogueira." in so_parciais, so_parciais)
 mun = {"codigo_ibge": "3138401", "nome": "Leopoldina", "comunidades": [{"nome": "Piacatuba (Tebas)", "distrito": "Tebas"}, {"nome": "Graminha", "distrito": "Piacatuba"},
@@ -200,9 +209,9 @@ try:
     a = gerar()
     leo = a["municipios"][0]
     conferir("aviso: a mensagem da rádio pelo modelo da empresa (motivo, telefone, sem sufixo de distrito)",
-             leo["mensagem"].startswith("Atenção, ouvintes. A Distribuidora EMG informa: no dia 12/11, das 8h às 14h, haverá desligamento "
-                                        "programado de energia para poda de árvores perto da rede nas comunidades ")
-             and leo["mensagem"].endswith("Dúvidas: 0800 701 0102.") and "(Tebas)" not in leo["mensagem"]
+             leo["mensagem"].startswith("Pessoal de Leopoldina, no dia 12/11, das 8h às 14h, vamos precisar desligar a energia da sua região "
+                                        "para poda de árvores perto da rede. Comunidades: ")
+             and leo["mensagem"].endswith("Qualquer dúvida, entre em contato pelo site, WhatsApp ou app.") and "(Tebas)" not in leo["mensagem"]
              and leo["segundos_mensagem"] == round(len(leo["mensagem"].split()) / 2.5), leo["mensagem"])
     hist = op.get(f"/api/historico/{a['id']}").json()["municipios"][0]
     conferir("histórico: guarda a mensagem da rádio", hist["mensagem"] == leo["mensagem"])
@@ -225,12 +234,12 @@ try:
              and dup.headers.get("X-Farol-Campo") == "nome", dup.text[:120])
     leo_id = r_leo.json()["radio"]["id"]
     r_pia = adm.post("/api/radios", json={"nome": "Rádio Comunitária de Tebas (demonstração)", "email": "tebas@example.com",
-                                          "alcance": {"comunidades": [{"municipio": "3138401", "nome": "Piacatuba", "distrito": "Tebas"}]},
+                                          "alcance": {"comunidades": [{"municipio": "3138401", "nome": "Piacatuba", "distrito": "Piacatuba"}]},
                                           "valor_padrao": "300", "cobranca": "fechado"})
     pia_id = r_pia.json()["radio"]["id"]
     conferir("Operador não altera rádio (403); Admin altera", op.patch(f"/api/radios/{leo_id}", json={"nome": "x"}).status_code == 403
              and adm.patch(f"/api/radios/{pia_id}", json={"nome": "Rádio Comunitária de Tebas (demonstração)", "email": "tebas@example.com",
-                                                         "alcance": {"comunidades": [{"municipio": "3138401", "nome": "Piacatuba", "distrito": "Tebas"}]},
+                                                         "alcance": {"comunidades": [{"municipio": "3138401", "nome": "Piacatuba", "distrito": "Piacatuba"}]},
                                                          "valor_padrao": "350", "cobranca": "fechado"}).status_code == 200)
     erros = {"e-mail inválido": {"nome": "R", "email": "nao-e-email"}, "sem contato": {"nome": "Rádio X"},
              "município fora da concessão": {"nome": "Rádio X", "email": "x@example.com", "alcance": {"municipios": ["3550308"]}},
@@ -271,7 +280,7 @@ try:
     sug = op.get(f"/api/historico/{a['id']}/radios").json()
     sl = next(m for m in sug["municipios"] if m["nome"] == "Leopoldina")
     sj = next(m for m in sug["municipios"] if m["nome"] == "São João Nepomuceno")
-    conferir("sugestão: Leopoldina com as duas rádios (a de Tebas só pela Piacatuba de Tebas); São João sem rádio",
+    conferir("sugestão: Leopoldina com as duas rádios (a segunda só pela comunidade Piacatuba, que agora é uma só); São João sem rádio",
              {x["radio_id"] for x in sl["radios"]} == {leo_id, pia_id} and next(x for x in sl["radios"] if x["radio_id"] == pia_id)["comunidades"] == 1
              and not sl["sem_radio"] and not sj["radios"] and len(sj["sem_radio"]) >= 1, json.dumps(sug["municipios"], ensure_ascii=False)[:300])
 
@@ -336,7 +345,7 @@ try:
     rw = op.post(f"/api/historico/{a['id']}/envios", json={"municipio": "3138401", "radio_id": leo_id, "canal": "whatsapp", "texto": texto,
                                                            "valor": "150", "cobranca": "minuto"})
     conferir("WhatsApp: link wa.me com o número (55 + DDD) e o texto; auditoria", rw.status_code == 200
-             and rw.json()["whatsapp_url"].startswith("https://wa.me/5532999990001?text=Aten%C3%A7%C3%A3o")
+             and rw.json()["whatsapp_url"].startswith("https://wa.me/5532999990001?text=Pessoal")
              and sql("SELECT 1 FROM registro WHERE acao = 'enviou por WhatsApp'"), rw.text[:200])
     rc = op.post(f"/api/historico/{a['id']}/envios", json={"municipio": "3138401", "radio_id": pia_id, "canal": "copia", "texto": texto,
                                                            "valor": "350", "cobranca": "fechado"})
@@ -393,7 +402,7 @@ try:
     deslig = op.post(f"/api/historico/{a['id']}/envios", json={**base_envio, "canal": "email", "texto": texto, "valor": "5"})
     conferir("e-mail desligado (FAROL_EMAIL=0 ou sem SMTP): 503 e a configuração diz", deslig.status_code == 503
              and op.get("/api/config").json()["email"] is False, deslig.text[:120])
-    del os.environ["FAROL_EMAIL"]
+    os.environ["FAROL_EMAIL"] = "smtp"
 
     # aviso cancelado e outra empresa
     op.post(f"/api/historico/{a2['id']}/cancelar", json={"motivo": "teste de cancelamento"})

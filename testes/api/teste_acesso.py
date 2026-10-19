@@ -77,18 +77,13 @@ def gerar(c):
     return c.post("/api/avisos", json={"pacote": r.json()["pacote"], "data": "12/11", "horario": "8h às 14h", "conferi": True})
 
 
-def baixar_json(c):
-    return c.post("/api/planilha/json", files={"arquivo": ("p.csv", planilha)})
-
-
 # ---------- 1. Sem login ----------
 anon = cliente()
 conferir("sem login: /api/saude responde", anon.get("/api/saude").status_code == 200)
 fechadas = {"GET /api/config": anon.get("/api/config"), "GET /api/concessao": anon.get("/api/concessao"),
             "GET /api/historico": anon.get("/api/historico"), "GET /api/painel": anon.get("/api/painel"), "GET /api/usuarios": anon.get("/api/usuarios"),
             "POST /api/avisos": anon.post("/api/avisos", json={"pacote": "x", "data": "1", "horario": "1"}),
-            "POST /api/planilha": importar(anon), "POST /api/planilha/json": baixar_json(anon),
-            "POST /api/planilha/relatorio": anon.post("/api/planilha/relatorio", json={"pacote": "x"}),
+            "POST /api/planilha": importar(anon),
             "GET /api/modelo-planilha": anon.get("/api/modelo-planilha")}
 conferir("sem login: todas as outras rotas respondem 401", all(r.status_code == 401 for r in fechadas.values()),
          str({k: r.status_code for k, r in fechadas.items()}))
@@ -116,11 +111,11 @@ clientes = {"operador": op, "admin_empresa": pronto("admin@emg.example"), "consu
             "admin_farol": pronto("admin@farol.example")}
 esperado = {  # rota -> perfis que podem
     "gerar aviso": {"admin_empresa", "operador"}, "conferir planilha": {"admin_empresa", "operador"},
-    "baixar JSON com UCs": {"admin_empresa", "operador"}, "histórico": {"admin_empresa", "operador", "consulta"},
+    "histórico": {"admin_empresa", "operador", "consulta"},
     "dashboard": {"admin_empresa", "operador", "consulta"},
     "usuários": {"admin_empresa"}, "empresas": {"admin_farol"}, "registro": {"admin_farol", "admin_empresa"},
 }
-rotas = {"gerar aviso": gerar, "conferir planilha": importar, "baixar JSON com UCs": baixar_json, "histórico": lambda c: c.get("/api/historico"), "dashboard": lambda c: c.get("/api/painel"), "usuários": lambda c: c.get("/api/usuarios"),
+rotas = {"gerar aviso": gerar, "conferir planilha": importar, "histórico": lambda c: c.get("/api/historico"), "dashboard": lambda c: c.get("/api/painel"), "usuários": lambda c: c.get("/api/usuarios"),
          "empresas": lambda c: c.get("/api/empresas"), "registro": lambda c: c.get("/api/registro")}
 erros = []
 for rota, f in rotas.items():

@@ -57,7 +57,7 @@ def aviso(dias_atras, data, municipios):
 LEO_A = municipio("3138401", "Leopoldina", 50, [("Graminha", 30), ("Boa Sorte", 20)], {"locais": 40, "palavras": 200, "segundos": 100})
 SJN = municipio("3162805", "São João Nepomuceno", 4, [("Pedra Dourada", 4)])
 LEO_B = municipio("3138401", "Leopoldina", 10, [("Graminha", 10)])
-HISTORICO = [aviso(1, f"{EM_10_DIAS:%d/%m}", [LEO_A, SJN]), aviso(200, "01/03", [LEO_B])]
+HISTORICO = [aviso(1, f"{EM_10_DIAS:%d/%m}", [LEO_A, SJN]), aviso(200, f"{HOJE - timedelta(days=197):%d/%m}", [LEO_B])]
 
 
 def consulta(nome, **params):
@@ -134,7 +134,7 @@ def gravar(empresa_id, dias_atras, data, ms):
 
 
 gravar(dono["empresa_id"], 0, f"{EM_10_DIAS:%d/%m}", [LEO_A, SJN])
-gravar(dono["empresa_id"], 200, "01/03", [LEO_B])
+gravar(dono["empresa_id"], 200, f"{HOJE - timedelta(days=197):%d/%m}", [LEO_B])
 outra = banco_acesso.criar_empresa("Outra distribuidora", "OUT", "outra.example")
 gravar(outra["id"], 0, "05/12", [municipio("3143906", "Muriaé", 999, [("Barra do Muriaé", 999)])])
 

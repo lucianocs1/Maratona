@@ -448,23 +448,12 @@ conferir("com justificativa: 200 e a justificativa (limpa) na auditoria com as c
          com_just.status_code == 200 and registros("justificou rejeições acima do limite")[-1]
          == "5 de 7 linhas: Planilha de teste com linhas ruins de propósito.", str(registros("justificou rejeições acima do limite")[-1:]))
 
-# relatório (CSV) e JSON com as UCs
+# o relatório CSV da planilha e o JSON com as UCs saíram do produto (18/10/2026): as rotas não existem mais
 rel = cli.post("/api/planilha/relatorio", json={"pacote": jr["pacote"]})
-linhas_rel = rel.content.decode("utf-8-sig").splitlines()
-conferir("relatório CSV: uma linha por linha da planilha, com situação e motivo, sem UC",
-         rel.status_code == 200 and len(linhas_rel) == 2 + 7 and linhas_rel[1] == "linha;situacao;motivo_ou_correcao;equipamento_vital;avisos"
-         and "1000000004" not in rel.text and "4;corrigida;latitude e longitude estavam trocadas" in rel.text, rel.text[:300])
-perigoso = importar(csv_bytes(t.head(5)), nome="=HYPERLINK(1).csv").json()
-rel2 = cli.post("/api/planilha/relatorio", json={"pacote": perigoso["pacote"]}).content.decode("utf-8-sig")
-conferir("relatório CSV: nome de arquivo com fórmula sai com apóstrofo", rel2.startswith("arquivo;'=HYPERLINK"), rel2[:60])
-app_mod._envios.clear()
 rj = cli.post("/api/planilha/json", files={"arquivo": ("planilha.csv", csv_bytes(t))})
-conferir("Baixar JSON (Operador): 200, com os números de UC, registrado na auditoria",
-         rj.status_code == 200 and rj.json()["pontos"][0]["uc"] == str(t["uc"].iloc[0])
-         and "attachment" in rj.headers.get("content-disposition", "") and registros("baixou o JSON da planilha (com números de UC)"),
-         rj.text[:100])
-conferir("Baixar JSON: o mesmo arquivo dá o mesmo conteúdo (reprodutível) e o sha256 da conferência",
-         rj.json()["arquivo"]["sha256"] == ji["conferencia"]["sha256"], "")
+conferir("relatório CSV e JSON com as UCs removidos: as rotas respondem 404", rel.status_code in (404, 405) and rj.status_code in (404, 405),
+         f"{rel.status_code} {rj.status_code}")
+app_mod._envios.clear()
 
 # erro inesperado: nada é gerado, código ERR-xxxx, sem dados da planilha na mensagem
 sem_erro = TestClient(app, base_url="http://farol.teste", raise_server_exceptions=False)

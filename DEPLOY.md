@@ -3,8 +3,9 @@
 O app roda em produção igual à máquina local: a mesma API (FastAPI) e a mesma tela, num container
 Docker no Render, com o banco Postgres + PostGIS no Neon. Diferenças em produção:
 
-- **Sem o áudio do aviso** (`FAROL_AUDIO=0`): no plano gratuito do Render (512 MB) não cabe a voz, que
-  pede cerca de 520 MB a mais. A tela esconde Ouvir e Baixar áudio; o PDF e o resto funcionam.
+- **Áudio do aviso pela voz de nuvem** (`FAROL_AUDIO=1`, `FAROL_VOZ_LOCAL=0`, `FAROL_VOZ_NUVEM=google` e `GOOGLE_TTS_KEY` como segredo): no plano gratuito do Render (512 MB) não cabe a voz local (Piper), que
+  pede cerca de 520 MB a mais; o áudio sai pela voz do Google (só o texto do aviso, que já é público, sai do servidor). Sem a chave, o áudio fica indisponível.
+- **E-mail em modo demonstração** (`FAROL_EMAIL=demo`): o e-mail é montado e registrado, mas não é entregue. Para entregar de verdade, tire essa variável e preencha `FAROL_SMTP_*`.
 - **Só HTTPS** (`FAROL_PRODUCAO=1`): cookie de sessão `Secure`, HSTS e sem a documentação interativa (`/api/docs`).
 - O serviço gratuito **dorme** depois de um tempo sem uso; o primeiro acesso depois disso leva cerca de um minuto.
 - Rede elétrica e clientes continuam **fictícios**. Antes de dado real da distribuidora: login com MFA,

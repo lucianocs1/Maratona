@@ -63,7 +63,7 @@ if EMAIL:
             break
         except OSError:
             time.sleep(0.2)
-    env.pop("FAROL_EMAIL")
+    env["FAROL_EMAIL"] = "smtp"   # o .env pode ter "demo"
     env.update({"FAROL_SMTP_HOST": "127.0.0.1", "FAROL_SMTP_PORTA": str(SMTP), "FAROL_SMTP_SEGURANCA": "nenhuma",
                 "FAROL_SMTP_USUARIO": "", "FAROL_SMTP_SENHA": "", "FAROL_SMTP_REMETENTE": "Norte <avisos@farol.example>",
                 "FAROL_URL_PUBLICA": f"http://127.0.0.1:{PORTA}", "FAROL_MAILPIT": f"http://127.0.0.1:{WEB}",

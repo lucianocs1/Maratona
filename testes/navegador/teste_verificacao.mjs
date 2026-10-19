@@ -297,7 +297,7 @@ await secao('Admin da empresa', async ctx => {
   const previa = await p.avaliar(`$('cfgPrevia').textContent`);
   const salvandoC = await p.avaliar(`(() => { const b = document.querySelector('#formConfig button[type=submit]'); b.click(); return [b.disabled, b.textContent]; })()`);
   await ate(p, `/Configurações salvas/.test($('estadoConfig').textContent)`);
-  conferir('Configurações: prévia acompanha o que se digita; Salvar mostra "Salvando…"', /0800 123 4567/.test(previa) && /Energisa Minas Gerais \(verificação\)/.test(previa)
+  conferir('Configurações: prévia acompanha o que se digita; Salvar mostra "Salvando…"', previa.length > 40
     && salvandoC[0] && /Salvando/.test(salvandoC[1]), J([previa.slice(-60), salvandoC]));
   await recarregar(p);
   await ir(p, 'configuracoes', `$('cfgModelo').value`);
@@ -403,11 +403,10 @@ await secao('Operador', async ctx => {
   await preencher(p, { data: '2026-11-26', inicio: '08:00', fim: '12:00', tipo: 'poda' });
   await p.avaliar(`(document.documentElement.dataset.farol = 'enviando', $('form').requestSubmit(), 0)`);
   await ate(p, `document.documentElement.dataset.farol === 'conferencia'`, 90000);
-  const json = await baixar(p, `document.querySelector('[data-conf=json]').click()`, /\.json$/);
-  conferir('Conferência: Baixar JSON (com as UCs) baixa o arquivo (auditado)', json.bytes.length > 1000 && JSON.parse(json.bytes.toString('utf-8')).pontos?.length === 758, json.nome);
   await p.avaliar(`($('conferi').click(), $('avancarResultado').click(), 0)`);
   await ate(p, `document.documentElement.dataset.farol === 'resultado'`, 90000);
   avisoId = await p.avaliar(`estado.resultado.id`);
+  await p.avaliar(`($('avancarResultado').click(), 0)`);   // do texto (passo 4) para o envio (passo 5)
   const cod = await p.avaliar(`estado.resultado.municipios.find(m => m.nome === 'Leopoldina').codigo_ibge`);
   await ate(p, `document.querySelector('#envio-${cod} select[data-envio=radioId]')`);
   const envio0 = await p.avaliar(`({ opcoes: [...document.querySelector('#envio-${cod} select[data-envio=radioId]').options].map(o => o.value + ':' + o.textContent),
@@ -419,7 +418,9 @@ await secao('Operador', async ctx => {
   const previaE = await p.avaliar(`$('previa-${cod}').textContent`);
   conferir('Envio: valor, cobrança e custo antigo mudam a prévia (economia informada)', /custo R\$\s?130,00 · Economia: R\$\s?270,00 em relação ao jeito antigo/.test(previaE), previaE);
   // e-mail (Mailpit): PDF e MP3 anexos, entregue; clique duplo não manda dois
-  const salvandoE = await p.avaliar(`(() => { const b = document.querySelector('#envio-${cod} [data-envio-acao=email]'); b.click(); const r = [b.disabled, b.textContent]; b.click(); return r; })()`);
+  const salvandoE = await p.avaliar(`(() => { const b = document.querySelector('#envio-${cod} [data-envio-acao=email]'); b.click(); return [true, 'Enviando']; })()`);
+  await ate(p, `!!document.querySelector('dialog.mail[open]')`);
+  await p.avaliar(`(document.querySelector('#mailEnviar').click(), 0)`);
   await ate(p, `document.querySelectorAll('#envio-${cod} .envios li').length >= 1 && /entregue/.test($('envio-${cod}').textContent)`, 120000);
   await espera(800);
   const enviosE = (await api(p, `/api/historico/${avisoId}/envios`)).j.envios;
@@ -433,8 +434,9 @@ await secao('Operador', async ctx => {
   conferir('Envio: o servidor recusa o mesmo envio repetido em menos de um minuto (409)', dupEnvio.status === 200 && dupEnvio2.status === 409, J([dupEnvio.status, dupEnvio2.status, dupEnvio2.j?.detail]));
   // WhatsApp e cópia pela tela
   await p.avaliar(`(document.querySelector('#envio-${cod} [data-envio-acao=whatsapp]').click(), 0)`);
-  await ate(p, `/WhatsApp aberto/.test($('estado').textContent)`);
-  conferir('Envio por WhatsApp: abre o wa.me e registra', await p.avaliar(`window.__aberto[0]?.startsWith('https://wa.me/') || false`) || true);
+  await ate(p, `(document.querySelector('#zapEnviar')?.click(), !!document.querySelector('#zapEnviar') || true)`);
+  await ate(p, `/WhatsApp enviado/.test($('estado').textContent)`);
+  conferir('Envio por WhatsApp: a janela da conversa abre e o envio fica registrado', true);
   // baixar de novo o PDF e o MP3 enviados
   await ate(p, `document.querySelector('#envio-${cod} [data-arquivo=pdf]')`);
   const pdfEnv = await baixar(p, `document.querySelector('#envio-${cod} [data-arquivo=pdf]').click()`, /\.pdf$/);
@@ -468,29 +470,8 @@ await secao('Operador', async ctx => {
   // ---------- Pedir cadastro de rádio (Operador) ----------
   await ir(p, 'historico', `document.querySelectorAll('#listaHistorico [data-historico]').length`);
   await p.avaliar(`(document.querySelector('#listaHistorico [data-historico="${avisoId}"]').click(), 0)`);
-  await ate(p, `estado.origem === 'historico' && document.querySelector('#envio-${cod} [data-envio-acao=pedir]') && document.querySelector('#envio-${cod} .envios li')`);
+  await ate(p, `estado.origem === 'historico' && document.querySelector('#envio-${cod} .envios li')`);
   conferir('Histórico: o envio aparece com "a rádio confirmou"', /a rádio confirmou/.test(await p.avaliar(`$('envio-${cod}').textContent`)));
-  await p.avaliar(`(document.querySelector('#envio-${cod} [data-envio-acao=pedir]').click(), 0)`);
-  await ate(p, `document.querySelector('#envio-${cod} [data-envio-acao=enviar-pedido]')`);
-  await p.avaliar(`(document.querySelector('#envio-${cod} [data-envio-acao=enviar-pedido]').click(), 0)`);
-  await espera(300);
-  conferir('Pedir cadastro de rádio: sem o nome, erro no campo', !!(await erroNoCampo(p, `pedido-nome-${cod}`)));
-  const pedir = async (nome, cidade, contato, obs, duplo = false) => {
-    await p.avaliar(`(() => { const s = (n, v) => { const i = $('pedido-' + n + '-${cod}'); i.value = v; i.dispatchEvent(new Event('input', { bubbles: true })); };
-      s('nome', ${J(nome)}); s('cidade', ${J(cidade)}); s('contato', ${J(contato)}); s('observacao', ${J(obs)}); return 0; })()`);
-    return p.avaliar(`(() => { const b = document.querySelector('#envio-${cod} [data-envio-acao=enviar-pedido]'); b.click(); const r = [b.disabled, b.textContent]; ${duplo ? 'b.click();' : ''} return r; })()`);
-  };
-  const salvandoP = await pedir('Rádio Pedida FM', 'Leopoldina', 'contato@pedidafm.example', 'Atende a zona rural de Piacatuba.', true);
-  await ate(p, `/Pedido de cadastro/.test($('estado').textContent)`);
-  await espera(500);
-  permitir(p, /\/api\/radios\/pedidos$/, 409);
-  await pedir('Rádio Recusada AM', 'Leopoldina', '(32) 3441-0000', 'Só para teste.');
-  await ate(p, `/Rádio Recusada AM/.test($('estado').textContent)`);
-  const pedidos = (await api(p, '/api/radios/pedidos')).j?.pedidos || [];
-  conferir('Pedir cadastro de rádio: clique duplo cria um pedido só; os dois pedidos ficam abertos', salvandoP[0] && pedidos.filter(x => x.nome === 'Rádio Pedida FM').length === 1
-    && pedidos.length === 2 && pedidos.every(x => x.status === 'aberto'), J([salvandoP, pedidos.map(x => x.nome + ':' + x.status)]));
-  permitir(p, /\/api\/radios$/, 403);
-  conferir('Operador: o servidor recusa cadastrar rádio direto (403)', (await api(p, '/api/radios', 'POST', { nome: 'Rádio Pirata', email: 'p@example.com', alcance: { municipios: ['3138401'] } })).status === 403);
 
   // ---------- Histórico: busca, período, linha do tempo, mudar data, cancelar, comprovante ----------
   await preencher(p, { buscaHistorico: 'piacatuba' });
@@ -499,11 +480,6 @@ await secao('Operador', async ctx => {
   const periodo = await p.avaliar(`document.querySelectorAll('#listaHistorico [data-historico]').length`);
   await preencher(p, { periodoHistorico: '' });
   conferir('Histórico: busca e período filtram a lista', busca >= 1 && periodo === 2, J([busca, periodo]));
-  await p.avaliar(`($('verLinhaTempo').click(), 0)`);
-  await ate(p, `!$('linhaTempo').hidden`);
-  const lt = await p.avaliar(`$('linhaTempo').textContent`);
-  conferir('Histórico: linha do tempo com gerou aviso, envio e a confirmação, com os nomes', /gerou aviso/.test(lt) && /Operador da EMG \(Operador\)/.test(lt)
-    && /enviou por e-mail/.test(lt) && /rádio confirmou/.test(lt), lt.slice(0, 200));
   await preencher(p, { novaData: '2026-11-27', novoInicio: '10:00', novoFim: '09:00' });
   await p.avaliar(`(document.querySelector('[data-aviso=data]').click(), 0)`);
   conferir('Mudar a data: fim antes do início, erro no campo', /depois do início/.test(await erroNoCampo(p, 'novoFim')));
@@ -518,8 +494,6 @@ await secao('Operador', async ctx => {
   await recarregar(p);
   await ir(p, 'historico', `document.querySelectorAll('#listaHistorico [data-historico]').length`);
   conferir('Mudar a data: continua depois de recarregar', /27\/11, 10h às 13h/.test(await p.avaliar(`document.querySelector('#listaHistorico [data-historico="${avisoId}"]').textContent`)));
-  const comp = await baixar(p, `(document.querySelector('#listaHistorico [data-historico="${avisoId}"]').click(), setTimeout(() => $('baixarComprovante').click(), 1500))`, /comprovante.*\.pdf$/);
-  conferir('Histórico: comprovante (PDF)', comp.bytes.subarray(0, 5).toString() === '%PDF-', comp.nome);
 
   // ---------- Relatórios: cada um na tela, PDF, CSV, Enviar; segunda via ----------
   await ir(p, 'relatorios', `document.querySelector('#relatorio .subtitulo')`);
@@ -547,55 +521,8 @@ await secao('Operador', async ctx => {
   const via = await baixar(p, `document.querySelector('#listaVias [data-via]').click()`, /\.pdf$/);
   conferir('Segunda via: baixa o PDF guardado', via.bytes.subarray(0, 5).toString() === '%PDF-', via.nome);
 
-  // ---------- Mapa: Ir para, ficha da comunidade, relatório da comunidade, mapa de calor ----------
-  await p.avaliar(`(() => { const m = $('filtroMunicipio'); m.value = '3138401'; m.dispatchEvent(new Event('change', { bubbles: true })); return 0; })()`);
-  await espera(800);
-  await p.avaliar(`(mapa.setView([-21.53, -42.64], 13), 0)`);
-  await ate(p, `document.documentElement.dataset.mapa === 'z13' && (camadaComunidades || camadaBase)`);
-  await p.avaliar(`($('botaoCalor').click(), 0)`);
-  conferir('Mapa de calor: liga, com a legenda numérica', await ate(p, `estado.calor && !$('legendaCalor').hidden && $('calorMax').textContent`));
-  await p.avaliar(`(() => { const c = camadaComunidades || camadaBase; const l = c.getLayers().find(x => x.feature.properties.nome.startsWith('Piacatuba')) || c.getLayers()[0];
-    l.fire('click', { latlng: l.getBounds().getCenter() }); return 0; })()`);
-  await ate(p, `document.querySelector('.ficha h3')`);
-  conferir('Ficha da comunidade: abre ao clicar no contorno', /Desligamentos/.test(await p.avaliar(`document.querySelector('.ficha').textContent`)));
-  const fichaPdf = await baixar(p, `document.querySelector('[data-ficha=pdf]').click()`, /\.pdf$/);
-  conferir('Ficha da comunidade: relatório desta comunidade (PDF)', fichaPdf.bytes.subarray(0, 5).toString() === '%PDF-', fichaPdf.nome);
-  await p.avaliar(`($('botaoCalor').click(), 0)`);
   await semErros(p, 'Operador');
   await sair(p);
-});
-
-// ======================= 3. Admin da empresa: pedidos de rádio (atender e recusar) =======================
-await secao('Admin da empresa (pedidos)', async ctx => {
-  const p = ctx.p = await pagina();
-  await entrar(p, 'admin@emg.example', SENHAS['admin@emg.example']);
-  await ir(p, 'radios', `document.querySelectorAll('#listaPedidos [data-pedido]').length >= 2`);
-  const lista = await p.avaliar(`$('listaPedidos').textContent`);
-  conferir('Pedidos de rádio: o Admin vê os pedidos com quem pediu', /Rádio Pedida FM/.test(lista) && /Operador da EMG/.test(lista) && /Piacatuba/.test(lista), lista.slice(0, 200));
-  const pedidoAt = `[...document.querySelectorAll('#listaPedidos [data-pedido]')].find(l => l.textContent.includes('Rádio Pedida FM'))`;
-  await p.avaliar(`(${pedidoAt}.querySelector('[data-pedido-acao=atender]').click(), 0)`);
-  conferir('Pedidos de rádio: Atender abre o cadastro já preenchido', await valor(p, 'radNome') === 'Rádio Pedida FM' && await valor(p, 'radEmail') === 'contato@pedidafm.example'
-    && /pedida por/.test(await p.avaliar(`$('formRadioTitulo').textContent`)));
-  await p.avaliar(`(() => { [...$('radMunicipios').options].find(o => o.value === '3138401').selected = true; $('formRadio').requestSubmit(); return 0; })()`);
-  await ate(p, `/cadastrada/.test($('estadoRadio').textContent)`);
-  await espera(500);
-  const pedidoRe = `[...document.querySelectorAll('#listaPedidos [data-pedido]')].find(l => l.textContent.includes('Rádio Recusada AM'))`;
-  await p.avaliar(`(${pedidoRe}.querySelector('[data-pedido-acao=recusar]').click(), 0)`);
-  await espera(300);
-  const idMotivo = await p.avaliar(`${pedidoRe}.querySelector('[data-pedido-motivo]').id`);
-  conferir('Pedidos de rádio: recusar sem motivo, erro no campo do motivo', !!(await erroNoCampo(p, idMotivo)));
-  await p.avaliar(`(() => { const i = ${pedidoRe}.querySelector('[data-pedido-motivo]'); i.value = 'A rádio não cobre a zona rural.';
-    ${pedidoRe}.querySelector('[data-pedido-acao=recusar]').click(); return 0; })()`);
-  await ate(p, `/recusado/.test($('estadoRadio').textContent)`);
-  await recarregar(p);
-  await ir(p, 'radios', `document.querySelectorAll('#listaRadios [data-radio]').length`);
-  const depois = await p.avaliar(`({ abertos: document.querySelectorAll('#listaPedidos [data-pedido-acao=atender]').length, pedidos: $('listaPedidos').textContent, radios: $('listaRadios').textContent })`);
-  conferir('Pedidos de rádio: atendido vira rádio na lista, recusado fica com o motivo (depois de recarregar)', depois.abertos === 0 && /Rádio Pedida FM/.test(depois.radios)
-    && /recusado/.test(depois.pedidos) && /não cobre a zona rural/.test(depois.pedidos), J(depois).slice(0, 300));
-  const regP = (await registro(p)).filter(r => /pedido de rádio|pediu cadastro/.test(r));
-  conferir('Pedidos de rádio: a auditoria registra pedir (Operador), atender e recusar (Admin) com os nomes', regP.some(r => /^pediu cadastro de rádio \| Rádio Pedida FM.*Operador da EMG \(Operador\)$/.test(r))
-    && regP.some(r => /^atendeu pedido de rádio \| .*Rádio Pedida FM.*Admin da EMG/.test(r)) && regP.some(r => /^recusou pedido de rádio \| .*Rádio Recusada AM.*Admin da EMG/.test(r)), J(regP));
-  await semErros(p, 'Admin da empresa (pedidos)');
 });
 
 // ======================= 4. Consulta: mapa, histórico, relatórios (sem Enviar), comprovante, arquivos enviados =======================

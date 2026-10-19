@@ -66,8 +66,9 @@ async function abrirAviso(p) {
   await entrar(p, 'admin@emg.example');
   const csv = readFileSync(PLANILHA, 'utf8').split('\n').slice(0, 60).join('\n');
   const st = await p.avaliar(`(async () => {
-    await fetch('/api/radios', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ nome: 'Rádio Teste (demonstração)',
+    const rr = await fetch('/api/radios', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ nome: 'Rádio Teste (demonstração)',
       email: 'radio@example.com', alcance: { municipios: ['3138401'] }, valor_padrao: '120' }) });
+    window.__radio = rr.status + ' ' + (await rr.text()).slice(0, 120);
     const fd = new FormData(); fd.append('arquivo', new Blob([${J(csv)}], { type: 'text/csv' }), 'p.csv'); fd.append('data', '12/11'); fd.append('horario', '8h');
     const c = await (await fetch('/api/planilha', { method: 'POST', body: fd })).json();
     return (await fetch('/api/avisos', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ pacote: c.pacote, data: '12/11', horario: '8h', conferi: true }) })).status;
@@ -75,8 +76,9 @@ async function abrirAviso(p) {
   conferir('preparação: uma rádio e um aviso da EMG', st === 200, String(st));
   // o envio para a rádio: sem "null" embaixo dos botões; o select da cobrança mostra o texto inteiro (computador e celular)
   await ir(p, 'historico'); await abrirAviso(p);
-  conferir('envio para a rádio: aparece, sem "null" embaixo dos botões', await p.avaliar(`!!document.querySelector('.envio-radio [data-envio-acao="copia"]')
-    && !/\\bnull\\b/.test(document.querySelector('.envio-radio').textContent)`), await p.avaliar(`document.querySelector('.envio-radio')?.textContent.slice(-120)`));
+  await ate(p, `estado.radios.length > 0 && !!document.querySelector('.envio-radio select')`, 20000);
+  conferir('envio para a rádio: aparece, sem "null" embaixo dos botões', await p.avaliar(`!!document.querySelector('.envio-radio [data-envio-acao="whatsapp"]')
+    && !/\\bnull\\b/.test(document.querySelector('.envio-radio').textContent)`), (await p.avaliar(`window.__radio`)) + ' | ' + await p.avaliar(`document.querySelector('.envio-radio')?.textContent.slice(-120)`));
   for (const [w, h] of [[1280, 800], [360, 640]]) {
     await p.send('Emulation.setDeviceMetricsOverride', { width: w, height: h, deviceScaleFactor: 1, mobile: w < 1024 });
     await espera(300);

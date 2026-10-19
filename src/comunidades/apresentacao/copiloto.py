@@ -94,8 +94,11 @@ def _simulado_generico(texto: str, pedido: str) -> str:
     """O texto não segue a frase padrão (a mensagem pelo modelo da empresa, editável): regras que só tiram a
     abertura ou acrescentam um título ou uma frase, sem mexer em nenhum dado do aviso."""
     sem_abertura = re.sub(r"^(?:Atenção|Aviso|Importante)[^.!:]*[.!]\s*", "", texto)
+    # o padrão da Energisa ("Pessoal de ...") termina com frases fixas, sem dado nenhum: o simulado também as tira
+    sem_abertura = re.sub(r"\s*(?:Não esqueça de tirar os aparelhos da tomada\.|Qualquer dúvida, entre em contato pelo site, WhatsApp ou app\.)",
+                          "", sem_abertura).strip()
     if pedido == "curto":
-        if sem_abertura == texto:
+        if sem_abertura == texto.strip():
             raise CopilotoIndisponivel("O copiloto simulado não achou o que cortar neste texto. Use \"Desfazer edição\" "
                                        "e tente de novo, ou, com a IA de verdade (FAROL_IA=anthropic), qualquer texto funciona.")
         return sem_abertura

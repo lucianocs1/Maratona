@@ -50,12 +50,14 @@ from ..banco import acesso as banco_acesso
 from ..banco import base_territorial as banco
 from ..banco import clientes as banco_clientes
 from ..banco import localidades as banco_localidades
+from ..banco import microrregioes as banco_microrregioes
 from ..banco import rede as banco_rede
 from ..banco import radios as banco_radios
 from ..banco import relatorios as banco_relatorios
 from ..fontes.base_territorial import CRS_BASE
 from .. import correio
-from ..nucleo import agrupamento, auditoria, consultas, esquema_planilha, idiomas, mensagem, painel, selecao, travas, verificador
+from ..nucleo import prazo as prazo_regra
+from ..nucleo import agrupamento, auditoria, conflitos, consultas, esquema_planilha, idiomas, mensagem, painel, selecao, travas, verificador
 from ..nucleo import tipos_desligamento as tipos
 from ..nucleo.afetados import BaseMunicipio, afetados, localizar, municipio_de
 from ..nucleo.desligamento import PALAVRAS_POR_SEGUNDO, aviso_antigo_de_locais, locais_de
@@ -236,7 +238,7 @@ def comunidades(codigo: str, u: dict = Depends(usuario_atual)) -> JSONResponse:
     g = banco.comunidades_geojson(codigo)
     if g is None:
         raise HTTPException(404, "Município fora da base da concessão.")
-    return JSONResponse(g, headers={"Cache-Control": "private, max-age=3600"})
+    return JSONResponse(g, headers={"Cache-Control": "private, no-cache"})   # confere com o servidor a cada vez: o desenho pode ser refeito
 
 
 @app.get("/api/municipios/{codigo}/rede")
@@ -265,6 +267,15 @@ def localidades_oficiais(u: dict = Depends(usuario_atual)) -> JSONResponse:
     """Localidades oficiais do IBGE (Censo 2022) da área da empresa, para a camada do mapa: [lat, lon, nome, categoria,
     município]. Dado público; os três perfis da empresa veem, o Admin do Norte não (mapa operacional)."""
     return JSONResponse({"fonte": "IBGE, Censo 2022", "localidades": banco_localidades.para_o_mapa(_area_do_mapa(u))},
+                        headers={"Cache-Control": "private, max-age=3600"})
+
+
+@app.get("/api/microrregioes")
+def microrregioes(u: dict = Depends(usuario_atual)) -> JSONResponse:
+    """Microrregiões do IBGE que tocam a área da empresa (polígono, nome, mesorregião e quantos municípios da área),
+    para a camada do mapa. Dado público; os três perfis da empresa veem, o Admin do Norte não (mapa operacional)."""
+    return JSONResponse({"fonte": "IBGE, divisão regional (microrregiões)",
+                         "microrregioes": banco_microrregioes.para_o_mapa(_area_do_mapa(u))},
                         headers={"Cache-Control": "private, max-age=3600"})
 
 
@@ -609,7 +620,8 @@ def _base_escolha(modelo, comunidade: dict, distritos: dict) -> dict:
             "colunas": [f for f in selecao.FILTROS if f in modelo.colunas] + (["situacao"] if "situacao" in modelo.colunas else [])}
 
 
-def _conferir_escolha(modelo, criterio, comunidade: dict, data: str, horario: str, idioma: str, cfg: dict, area: set[str]) -> dict:
+def _conferir_escolha(modelo, criterio, comunidade: dict, data: str, horario: str, idioma: str, cfg: dict, area: set[str],
+                      empresa_id: int | None = None) -> dict:
     """A conferência só das linhas escolhidas: as travas (vital, suspeitos, limite de rejeição, fora da área) valem sobre
     elas. Devolve também a escolha: o critério, a conta fechada (lidas, inativas fora, não escolhidas, escolhidas) e as
     inativas contadas por bairro e por circuito."""
@@ -618,6 +630,18 @@ def _conferir_escolha(modelo, criterio, comunidade: dict, data: str, horario: st
     n = resposta["conferencia"]["numeros"]
     resposta["escolha"] = {**selecao.resumo(criterio, e.conta, n["comunidades"]), "inativas": e.inativas}
     resposta["conferencia"]["conta"] = e.conta
+    if empresa_id is not None:   # só na conferência (não ao gerar): avisos da empresa que atropelam este horário na mesma região
+        agora = datetime.now(BRASILIA)
+        resposta["conflitos"] = conflitos.achar({"data": data, "horario": horario, "municipios": resposta["municipios"]},
+                                                banco_acesso.avisos(empresa_id, 300), agora)
+        # a data escolhida contra o prazo mínimo (72 h, ou 5 dias úteis com equipamento vital): se o aviso sair agora, está no prazo?
+        vital = sum(m["equipamento_vital"]["sim"] + m["equipamento_vital"]["a_confirmar"] for m in resposta["municipios"]) > 0
+        comeco = prazo_regra.inicio(data, horario, agora)
+        sit = prazo_regra.situacao(comeco, agora, vital, DIST.prazo_legal_horas, DIST.prazo_vital_dias_uteis)
+        resposta["prazo"]["situacao"] = {
+            "inicio": comeco.isoformat() if comeco else None, "limite": sit["limite"].isoformat() if sit["limite"] else None,
+            "no_prazo": sit["no_prazo"], "atraso_horas": sit["atraso_horas"], "vital": vital,
+            "dias_ate": (comeco.date() - agora.date()).days if comeco else None}
     return resposta
 
 
@@ -642,7 +666,7 @@ async def conferir_planilha(arquivo: UploadFile = File(...), data: str = Form(..
     cfg, area = config_empresa(u["empresa_id"]), _area_da_empresa(u)
     comunidade, distritos = _localizacao(modelo, area)
     planilha_inteira = selecao.Criterio(modo="planilha")
-    resposta = _conferir_escolha(modelo, planilha_inteira, comunidade, data, horario, idioma, cfg, area)
+    resposta = _conferir_escolha(modelo, planilha_inteira, comunidade, data, horario, idioma, cfg, area, u["empresa_id"])
     resposta["base"] = _base_escolha(modelo, comunidade, distritos)
     resposta["desligamento"] = {"tipo": tipo, "rotulo": tipos.ROTULOS[tipo], "motivo": motivo}
     _mensagens(resposta["municipios"], cfg, data, horario, idioma, motivo)
@@ -691,7 +715,7 @@ def conferir_escolha(dados: PedidoEscolha, u: dict = Depends(exigir("gerar_aviso
         raise HTTPException(422, str(e)) from None
     cfg, area = config_empresa(u["empresa_id"]), _area_da_empresa(u)
     criterio = selecao.canonico(dados.criterio)
-    resposta = _conferir_escolha(modelo, criterio, _localizacao(modelo, area)[0], data, horario, idioma, cfg, area)
+    resposta = _conferir_escolha(modelo, criterio, _localizacao(modelo, area)[0], data, horario, idioma, cfg, area, u["empresa_id"])
     resposta["desligamento"] = {"tipo": tipo, "rotulo": tipos.ROTULOS[tipo], "motivo": motivo}
     _mensagens(resposta["municipios"], cfg, data, horario, idioma, motivo)
     _alerta_repeticao(resposta, u, cfg)
@@ -741,35 +765,6 @@ def gerar_aviso(dados: PedidoAviso, u: dict = Depends(exigir("gerar_aviso"))) ->
     except banco_acesso.AvisoRepetido as e:
         raise HTTPException(409, f"Este aviso já foi gerado com esta conferência (aviso nº {e.args[0]}). "
                             "Para outro aviso, confira a planilha de novo.") from None
-
-
-@app.post("/api/planilha/json")
-async def baixar_json(arquivo: UploadFile = File(...), aba: str | None = Form(None, max_length=leitura.MAX_NOME_ABA),
-                      u: dict = Depends(exigir("baixar_json"))) -> Response:
-    """O JSON padronizado completo, com os números de UC: só num pedido explícito, reenviando o mesmo
-    arquivo (a tradução é reprodutível) e registrado na auditoria."""
-    modelo = await _ler_e_traduzir(arquivo, aba, u)
-    banco_acesso.registrar("baixou o JSON da planilha (com números de UC)",
-                           f"{modelo.arquivo.nome} (sha256 {modelo.arquivo.sha256}), {modelo.resumo.total} linhas", u["id"], u["empresa_id"])
-    nome = "".join(ch for ch in sem_acento(modelo.arquivo.nome.rsplit(".", 1)[0]) if ch.isalnum() or ch in "-_")[:60] or "planilha"
-    return Response(esquema_planilha.texto(modelo), media_type="application/json", headers={
-        "Content-Disposition": f'attachment; filename="farol-{nome}.json"'})
-
-
-class PedidoRelatorio(BaseModel):
-    pacote: str = Field(max_length=pacote_.MAX_PACOTE)
-
-
-@app.post("/api/planilha/relatorio")
-def relatorio_planilha(dados: PedidoRelatorio, u: dict = Depends(exigir("gerar_aviso"))) -> Response:
-    """Relatório da tradução (CSV): linha, situação, motivo ou correção e avisos. Sem UC nem coordenada."""
-    try:
-        modelo = pacote_.abrir(dados.pacote, u["id"], u["empresa_id"])
-    except pacote_.PacoteRecusado as e:
-        raise HTTPException(422, str(e)) from None
-    banco_acesso.registrar("baixou o relatório da planilha (CSV)", f"{modelo.arquivo.nome} (sha256 {modelo.arquivo.sha256})", u["id"], u["empresa_id"])
-    return Response("﻿" + travas.relatorio_csv(modelo), media_type="text/csv; charset=utf-8",
-                    headers={"Content-Disposition": 'attachment; filename="farol-relatorio-planilha.csv"'})
 
 
 def _alerta_repeticao(resposta: dict, u: dict, cfg: dict) -> str | None:

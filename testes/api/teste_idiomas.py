@@ -66,9 +66,9 @@ conferir("listas: 'e' em português, 'and' em inglês, 'y' (ou 'e' antes de som 
 mun = {"nome": "Leopoldina", "comunidades": [{"nome": "Graminha"}, {"nome": "Boa Sorte"}, {"nome": "Tomé Nogueira", "parcial": True}]}
 pt = mensagem.montar(mensagem.PADRAO, mensagem.valores_do_municipio(mun, distribuidora="Energisa", data="20/11", horario="8h às 14h",
                                                                    motivo="poda de árvores perto da rede"))
-conferir("mensagem em português idêntica à de antes da Fase K", pt == ("Atenção, ouvintes. A Energisa informa: no dia 20/11, das 8h às 14h, haverá "
-         "desligamento programado de energia para poda de árvores perto da rede nas comunidades Graminha e Boa Sorte. Ficará sem energia "
-         "parte de: Tomé Nogueira. Programe-se."), pt)
+conferir("mensagem em português no padrão da Energisa (desde 18/10/2026)", pt == ("Pessoal de Leopoldina, no dia 20/11, das 8h às 14h, vamos precisar "
+         "desligar a energia da sua região para poda de árvores perto da rede. Comunidades: Graminha e Boa Sorte. Parte de: Tomé Nogueira. "
+         "Não esqueça de tirar os aparelhos da tomada. Qualquer dúvida, entre em contato pelo site, WhatsApp ou app."), pt)
 en = mensagem.montar(mensagem.PADROES["en"], mensagem.valores_do_municipio(mun, distribuidora="Energisa", data="20/11", horario="8h às 14h",
                                                                           motivo=tipos_desligamento.motivo("poda", idioma="en")[1], idioma="en"))
 conferir("mensagem em inglês (padrão)", en == ("Attention, listeners. Energisa announces a scheduled power outage on November 20, from 8 a.m. to "
@@ -115,8 +115,8 @@ def gerar(idioma: str) -> dict:
 
 a_pt, a_en, a_es = gerar("pt-BR"), gerar("en"), gerar("es")
 m_pt, m_en, m_es = a_pt["municipios"][0], a_en["municipios"][0], a_es["municipios"][0]
-conferir("português: a mensagem de antes (modelo da empresa) e o aviso do algoritmo como antes",
-         m_pt["mensagem"].startswith("Atenção, ouvintes.") and "no dia 20/11, das 8h às 14h" in m_pt["mensagem"]
+conferir("português: a mensagem no padrão da empresa e o aviso do algoritmo como antes",
+         m_pt["mensagem"].startswith("Pessoal de Leopoldina,") and "no dia 20/11, das 8h às 14h" in m_pt["mensagem"]
          and "no dia 20/11, das 8h às 14h" in m_pt["aviso"], m_pt["mensagem"][:120])
 conferir("inglês: mensagem da rádio e aviso do algoritmo com data e hora em inglês",
          m_en["mensagem"].startswith("Attention, listeners.") and "on November 20, from 8 a.m. to 2 p.m." in m_en["mensagem"]

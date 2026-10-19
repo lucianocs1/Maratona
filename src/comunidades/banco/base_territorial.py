@@ -17,6 +17,7 @@ import numpy as np
 import shapely
 from pyproj import Transformer
 
+from ..nucleo.cores import colorir
 from .conexao import conectar
 
 SRID = 4674
@@ -42,6 +43,8 @@ CREATE TABLE IF NOT EXISTS comunidade (
     territorio   geometry(MultiPolygon, {SRID}),
     PRIMARY KEY (codigo_ibge, nome)
 );
+ALTER TABLE comunidade ADD COLUMN IF NOT EXISTS cor smallint;   -- tom da comunidade dentro do município (vizinhas diferentes)
+ALTER TABLE municipio ADD COLUMN IF NOT EXISTS cor smallint;   -- cor do município (municípios vizinhos diferentes)
 CREATE TABLE IF NOT EXISTS endereco_referencia (
     codigo_ibge  text NOT NULL REFERENCES municipio ON DELETE CASCADE,
     comunidade   text NOT NULL,
@@ -126,7 +129,7 @@ def enderecos(codigo: str, crs: str) -> tuple:
 
 # ---------- Território para o mapa da tela (só dados públicos, simplificado no PostGIS) ----------
 SIMPLIFICAR_MUNICIPIO = 0.0005    # graus (~50 m): contorno dos municípios da concessão
-SIMPLIFICAR_COMUNIDADE = 0.0002   # graus (~20 m): território de cada comunidade
+SIMPLIFICAR_COMUNIDADE = 0.0007   # graus (~80 m): território de cada comunidade (divisas retas, sem os degraus da grade)
 
 
 def _colecao(linhas: list, props: list[str]) -> dict:
@@ -136,11 +139,11 @@ def _colecao(linhas: list, props: list[str]) -> dict:
 
 @functools.lru_cache(maxsize=1)
 def concessao_geojson() -> dict:
-    """Contorno de cada município do banco (codigo, nome, uf)."""
+    """Contorno de cada município do banco (codigo, nome, uf e cor: índice da paleta, vizinhos nunca iguais)."""
     with conectar() as c, c.cursor() as cur:
-        cur.execute("SELECT codigo_ibge, nome, uf, ST_AsGeoJSON(ST_SimplifyPreserveTopology(contorno, %s), 5)"
+        cur.execute("SELECT codigo_ibge, nome, uf, cor, ST_AsGeoJSON(ST_SimplifyPreserveTopology(contorno, %s), 5)"
                     " FROM municipio ORDER BY nome", (SIMPLIFICAR_MUNICIPIO,))
-        return _colecao(cur.fetchall(), ["codigo_ibge", "nome", "uf"])
+        return _colecao(cur.fetchall(), ["codigo_ibge", "nome", "uf", "cor"])
 
 
 @functools.lru_cache(maxsize=80)
@@ -151,12 +154,42 @@ def comunidades_geojson(codigo: str) -> dict | None:
         cur.execute("SELECT 1 FROM municipio WHERE codigo_ibge = %s", (codigo,))
         if not cur.fetchone():
             return None
-        cur.execute("SELECT nome, distrito, enderecos,"
+        # ST_CoverageSimplify simplifica as divisas compartilhadas uma vez só: uma comunidade não se afasta da vizinha
+        cur.execute("SELECT nome, distrito, enderecos, cor, cor_mun,"
                     " ARRAY[ROUND(ST_Y(p)::numeric, 5)::float8, ROUND(ST_X(p)::numeric, 5)::float8],"
-                    " ST_AsGeoJSON(ST_SimplifyPreserveTopology(territorio, %s), 5)"
-                    " FROM comunidade, LATERAL ST_PointOnSurface(territorio) AS p"
-                    " WHERE codigo_ibge = %s ORDER BY nome", (SIMPLIFICAR_COMUNIDADE, codigo))
-        return _colecao(cur.fetchall(), ["nome", "distrito", "enderecos", "rotulo"])
+                    " ST_AsGeoJSON(simples, 5)"
+                    " FROM (SELECT c.nome, c.distrito, c.enderecos, c.cor, m.cor AS cor_mun, c.territorio,"
+                    "  ST_CoverageSimplify(c.territorio, %s) OVER (PARTITION BY c.codigo_ibge) AS simples"
+                    "  FROM comunidade c JOIN municipio m USING (codigo_ibge) WHERE c.codigo_ibge = %s) c, LATERAL ST_PointOnSurface(territorio) AS p"
+                    " ORDER BY nome", (SIMPLIFICAR_COMUNIDADE, codigo))
+        return _colecao(cur.fetchall(), ["nome", "distrito", "enderecos", "cor", "cor_mun", "rotulo"])
+
+
+TONS = 5   # tons de uma mesma cor para as comunidades de um município
+
+
+def colorir_mapa() -> tuple[int, int]:
+    """Cor de cada município (vizinhos nunca iguais) e tom de cada comunidade dentro do município (vizinhas nunca iguais).
+    Rodar depois de gravar ou refazer os territórios. Devolve (municípios, comunidades)."""
+    with conectar() as c, c.cursor() as cur:
+        cur.execute("SELECT codigo_ibge, ST_AsBinary(contorno) FROM municipio ORDER BY codigo_ibge")
+        muns = cur.fetchall()
+        g = gpd.GeoSeries([shapely.from_wkb(bytes(r[1])) for r in muns], crs=SRID).to_crs("EPSG:5880")
+        cur.executemany("UPDATE municipio SET cor = %s WHERE codigo_ibge = %s",
+                        [(k, r[0]) for k, r in zip(colorir(list(g.geometry), n_cores=6), muns)])
+        cur.execute("SELECT codigo_ibge, nome, ST_AsBinary(territorio) FROM comunidade WHERE territorio IS NOT NULL"
+                    " ORDER BY codigo_ibge, nome")
+        coms = cur.fetchall()
+        por_mun: dict[str, list] = {}
+        for r in coms:
+            por_mun.setdefault(r[0], []).append(r)
+        for cod, linhas in por_mun.items():
+            geo = gpd.GeoSeries([shapely.from_wkb(bytes(r[2])) for r in linhas], crs=SRID).to_crs("EPSG:5880")
+            cur.executemany("UPDATE comunidade SET cor = %s WHERE codigo_ibge = %s AND nome = %s",
+                            [(k, cod, r[1]) for k, r in zip(colorir(list(geo.geometry), n_cores=TONS), linhas)])
+    concessao_geojson.cache_clear()
+    comunidades_geojson.cache_clear()
+    return len(muns), len(coms)
 
 
 def enderecos_da_comunidade(codigo: str, nome: str, distrito: str | None) -> int | None:

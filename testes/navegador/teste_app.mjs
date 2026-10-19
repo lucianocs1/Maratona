@@ -99,9 +99,9 @@ const ucs = readFileSync(PLANILHA, 'utf-8').split(/\r?\n/).slice(1).filter(Boole
   await p.avaliar(`($('senhaNova2').value = ${JSON.stringify(NOVA)}, $('formSenha').requestSubmit(), 0)`);
   await ate(p, `estado.tela === 'app' && estado.concessao && document.documentElement.dataset.farol === 'pronto'`);
   const ini = await p.avaliar(`({ tela: estado.tela, abas: [...document.querySelectorAll('#abas button')].map(b => b.textContent).join(','),
-    conta: $('contaNome').textContent, municipios: estado.concessao?.features.length, idiomas: [...$('idioma').options].map(o => o.value).join(',') })`);
-  conferir('depois da troca: app do Operador (Novo aviso, Histórico e Relatórios), 66 municípios, 3 idiomas',
-    ini.tela === 'app' && ini.abas === 'Novo aviso,Histórico,Relatórios' && /Operador/.test(ini.conta) && ini.municipios === 66 && ini.idiomas === 'pt-BR,en,es', JSON.stringify(ini));
+    conta: $('contaNome').textContent, municipios: estado.concessao?.features.length })`);
+  conferir('depois da troca: app do Operador (Novo aviso, Histórico e Análises), 66 municípios',
+    ini.tela === 'app' && ini.abas === 'Novo aviso,Histórico,Análises' && /Operador/.test(ini.conta) && ini.municipios === 66, JSON.stringify(ini));
 
   // mapa inicial: de perto, o contorno e o nome das comunidades (antes de gerar aviso); de longe, só os municípios
   await p.avaliar(`(mapa.setView([-21.53, -42.64], 13), 0)`);
@@ -126,9 +126,9 @@ const ucs = readFileSync(PLANILHA, 'utf-8').split(/\r?\n/).slice(1).filter(Boole
     texto: $('botaoLegenda').textContent.trim(), expandida: $('botaoLegenda').getAttribute('aria-expanded'), altura: $('legenda').getBoundingClientRect().height })`);
   await captura(p, '1d_legenda_minimizada.png');
   await p.avaliar(`($('botaoLegenda').click(), 0)`);
-  conferir('camadas: o painel minimiza (só o botão "Camadas") e abre de novo', minimizada.itens === 1 && /Camadas$/.test(minimizada.texto)
+  conferir('camadas: o painel minimiza (só o botão "Camadas") e abre de novo', minimizada.itens === 1 && /Legenda$/.test(minimizada.texto)
     && minimizada.expandida === 'false' && minimizada.altura < 70 && await p.avaliar(`$('botaoLegenda').getAttribute('aria-expanded') === 'true'
-    && [...document.querySelectorAll('#legenda > li')].filter(l => l.offsetParent).length > 5`), JSON.stringify(minimizada));
+    && [...document.querySelectorAll('#legenda > li')].filter(l => l.offsetParent).length > 3`), JSON.stringify(minimizada));
   await p.avaliar(`($('botaoRede').click(), 0)`);
   conferir('rede fictícia: o interruptor esconde (e tira o crédito)', await p.avaliar(`!camadaRede && $('legendaRede').hidden
     && !document.querySelector('.leaflet-control-attribution').textContent.includes('OpenStreetMap')`));
@@ -138,8 +138,8 @@ const ucs = readFileSync(PLANILHA, 'utf-8').split(/\r?\n/).slice(1).filter(Boole
   const camadas = await p.avaliar(`({ interruptores: [...document.querySelectorAll('#legenda [role=switch]')].map(b => b.id),
     cliente: !$('camadaClientes').hidden, ligadoPadrao: $('botaoClientes').getAttribute('aria-checked'),
     alvos: [...document.querySelectorAll('#legenda .interruptor, #legenda .expandir')].filter(e => e.offsetParent).every(e => e.getBoundingClientRect().height >= 43.5) })`);
-  conferir('camadas: interruptores de comunidades, nomes, rede, clientes, localidades, calor e UCs, com alvo de 44 px; clientes desligada por padrão',
-    camadas.interruptores.join() === 'botaoComunidades,botaoNomes,botaoRede,botaoClientes,botaoLocalidades,botaoCalor,botaoUcs' && camadas.cliente && camadas.ligadoPadrao === 'false' && camadas.alvos, JSON.stringify(camadas));
+  conferir('legenda: interruptores de rede, clientes e UCs (comunidades, nomes e contornos sempre ligados), com alvo de 44 px; clientes desligada por padrão',
+    camadas.interruptores.join() === 'botaoRede,botaoClientes,botaoUcs' && camadas.cliente && camadas.ligadoPadrao === 'false' && camadas.alvos, JSON.stringify(camadas));
   await ate(p, `estado.resumoClientes && !$('contagemClientes').hidden`);
   const resumo = await p.avaliar(`({ total: estado.resumoClientes.total, chip: $('contagemClientes').textContent, classes: Object.keys(estado.resumoClientes.classes).join() })`);
   conferir('clientes fictícios: a contagem aparece ao lado do interruptor (só números)', resumo.total > 500000 && resumo.chip.replace(/\D/g, '') === String(resumo.total) && /Residencial/.test(resumo.classes), JSON.stringify(resumo));
@@ -158,37 +158,18 @@ const ucs = readFileSync(PLANILHA, 'utf-8').split(/\r?\n/).slice(1).filter(Boole
   conferir('clientes fictícios: os pontos estão pintados e visíveis no canvas do mapa (largura na tela = largura do desenho)',
     pixels.some(([w, tela, n]) => n > 500 && tela >= w / 2 - 2), JSON.stringify(pixels));
   await captura(p, '1e_clientes_ficticios.png');
-  await p.avaliar(`($('botaoNomes').click(), 0)`);
-  conferir('camadas: o interruptor dos nomes tira os nomes do mapa', await p.avaliar(`!camadaNomes && $('botaoNomes').getAttribute('aria-checked') === 'false'`));
-  await p.avaliar(`($('botaoNomes').click(), 0)`);
   await p.avaliar(`(document.querySelector('[data-expandir=legendaClientes]').click(), 0)`);
   conferir('camadas: a legenda de uma camada abre e fecha (aria-expanded)', await p.avaliar(`document.querySelector('[data-expandir=legendaClientes]').getAttribute('aria-expanded') === 'true'
     && !!document.querySelector('#legendaClientes .cli-vital')?.offsetParent`));
   await captura(p, '1f_camadas_clientes.png');
   await p.avaliar(`($('botaoClientes').click(), 0)`);
   conferir('clientes fictícios: o interruptor desliga e tira a camada', await p.avaliar(`!camadaClientes && $('botaoClientes').getAttribute('aria-checked') === 'false'`));
-  // localidades oficiais do IBGE: interruptor, um ponto por localidade com nome, categoria e município, e a contagem
-  await ate(p, `estado.localidades && !$('contagemLocalidades').hidden`);
-  conferir('localidades oficiais: 470 buscadas, com a contagem ao lado do interruptor, e a camada desligada por padrão',
-    await p.avaliar(`estado.localidades.length === 470 && $('contagemLocalidades').textContent.replace(/\D/g, '') === '470'
-      && $('botaoLocalidades').getAttribute('aria-checked') === 'false' && !camadaLocalidades`));
-  await p.avaliar(`($('botaoLocalidades').click(), 0)`);
-  await ate(p, `camadaLocalidades`);
-  const loc = await p.avaliar(`({ n: camadaLocalidades.getLayers().length, salvo: JSON.parse(localStorage.getItem('norte.camadas')).verLocalidades,
-    dica: (() => { const l = camadaLocalidades.getLayers()[0], c = l.getTooltip().getContent(); return (typeof c === 'function' ? c(l) : c).textContent; })() })`);
-  conferir('localidades oficiais: um ponto por localidade, com nome, categoria e município na dica, e o interruptor lembrado',
-    loc.n === 470 && /localidade oficial do IBGE/.test(loc.dica) && loc.salvo === true, JSON.stringify(loc));
-  await p.avaliar(`(mapa.setZoom(11), $('botaoClientes').getAttribute('aria-checked') === 'true' && $('botaoClientes').click(), 0)`);
-  await espera(700);
-  await captura(p, '1g_localidades_oficiais.png');
   await p.avaliar(`(mapa.setZoom(16), 0)`);
-  await p.avaliar(`($('botaoLocalidades').click(), 0)`);
-  conferir('localidades oficiais: o interruptor desliga e tira os pontos', await p.avaliar(`!camadaLocalidades && $('botaoLocalidades').getAttribute('aria-checked') === 'false'`));
   await p.avaliar(`(mapa.setZoom(13), 0)`);
   await ate(p, `document.documentElement.dataset.mapa === 'z13'`);
   await p.avaliar(`(mapa.setZoom(10), 0)`);
   await ate(p, `document.documentElement.dataset.mapa === 'z10'`);
-  conferir('de longe: sem nomes nem contornos das comunidades', await p.avaliar(`!camadaNomes && !camadaBase`));
+  conferir('de longe: sem os nomes das comunidades', await p.avaliar(`!camadaNomes`));
   // "Ir para": estado e município da concessão
   await p.avaliar(`(() => { const u = $('filtroUf'); u.value = 'MG'; u.dispatchEvent(new Event('change', { bubbles: true }));
     const m = $('filtroMunicipio'); m.value = '3138401'; m.dispatchEvent(new Event('change', { bubbles: true })); return 0; })()`);
@@ -201,7 +182,7 @@ const ucs = readFileSync(PLANILHA, 'utf-8').split(/\r?\n/).slice(1).filter(Boole
   const visivel = id => `!!$('${id}').offsetParent`;
   await p.avaliar(`($('avancar').click(), 0)`);
   conferir('funil: sem planilha, o passo 1 não avança (e diz por quê)', await p.avaliar(`estado.passo === 1 && ${visivel('passo-1')}
-    && $('estado').classList.contains('erro') && document.querySelector('#funil [data-passo="3"]').disabled`));
+    && $('estado').classList.contains('erro') && document.querySelector('#funil [data-passo="4"]').disabled`));
   await escolherArquivo(p, PLANILHA);
   await p.avaliar(`($('avancar').click(), 0)`);
   conferir('funil: com a planilha, passo 2 (data e horário)', await p.avaliar(`estado.passo === 2 && ${visivel('passo-2')} && !${visivel('passo-1')}
@@ -220,33 +201,25 @@ const ucs = readFileSync(PLANILHA, 'utf-8').split(/\r?\n/).slice(1).filter(Boole
   const conf3 = await p.avaliar(`({ visivel: ${visivel('conferencia')}, numeros: [...document.querySelectorAll('#conferencia dd')].map(d => d.textContent),
     amarelo: document.querySelector('#conferencia .alerta-amarelo')?.textContent || '', vermelho: !!document.querySelector('#conferencia .alerta-vermelho'),
     botao: $('avancarResultado').textContent, travado: $('avancarResultado').disabled, motivo: $('motivoGerar').textContent,
-    json: !!document.querySelector('[data-conf=json]'), relatorio: !!document.querySelector('[data-conf=relatorio]') })`);
-  conferir('conferência: números, suspeito amarelo (São João Nepomuceno), sem bloqueio vermelho, JSON e relatório',
-    conf3.visivel && conf3.numeros[0] === '758' && conf3.numeros[1] === '2' && /São João Nepomuceno/.test(conf3.amarelo) && !conf3.vermelho
-    && conf3.json && conf3.relatorio, JSON.stringify(conf3));
+    json: !!document.querySelector('[data-conf=json]'), relatorio: !!document.querySelector('[data-conf=relatorio]'),
+    verificacoes: document.querySelectorAll('#conferencia .verificacoes li').length })`);
+  conferir('conferência: diagnóstico (758 lidas, 758 entram), suspeito amarelo (São João Nepomuceno), sem bloqueio vermelho, sem JSON nem relatório para baixar',
+    conf3.visivel && conf3.numeros[0] === '758' && conf3.numeros[1].startsWith('758') && /São João Nepomuceno/.test(conf3.amarelo) && !conf3.vermelho
+    && !conf3.json && !conf3.relatorio && conf3.verificacoes >= 8, JSON.stringify(conf3));
   conferir('conferência: "Gerar aviso" travado até marcar "Conferi os números e o mapa"', conf3.botao === 'Gerar aviso' && conf3.travado
     && /Conferi/.test(conf3.motivo), JSON.stringify(conf3));
   await captura(p, '2a_conferencia.png');
-  await p.navegador.send('Browser.setDownloadBehavior', { behavior: 'allow', downloadPath: CAP, eventsEnabled: true });
-  const nomesBaixados = [];
-  p.navegador.on('Browser.downloadWillBegin', e => nomesBaixados.push(e.suggestedFilename));
-  await p.avaliar(`(document.querySelector('[data-conf=relatorio]').click(), 0)`);
-  await ate(p, `/Relatório da planilha baixado/.test($('estado').textContent)`);
-  await espera(500);
-  const rel = nomesBaixados.includes('farol-relatorio-planilha.csv') ? readFileSync(join(CAP, 'farol-relatorio-planilha.csv'), 'utf-8') : '';
-  conferir('Baixar relatório (CSV): uma linha por linha, sem UC', rel.split(/\r?\n/).filter(Boolean).length === 2 + 758
-    && !ucs.slice(0, 50).some(([uc]) => rel.includes(uc)), `${nomesBaixados} ${rel.slice(0, 80)}`);
   const conferencia = await p.avaliar(`({ passo: estado.passo, resumo: ${visivel('resumo')}, form: ${visivel('form')},
     texto: !!document.querySelector('#municipios textarea')?.offsetParent, listas: !!document.querySelector('#municipios .listas')?.offsetParent,
     titulo: $('tituloResultado').textContent })`);
-  conferir('funil: passo 4 (conferir) mostra os números e as comunidades, sem o texto do aviso',
-    conferencia.passo === 4 && conferencia.resumo && !conferencia.form && !conferencia.texto && conferencia.listas && /^Conferir/.test(conferencia.titulo),
+  conferir('funil: passo 3 da tela (conferir) mostra o diagnóstico e as comunidades, sem o texto do aviso',
+    conferencia.passo === 4 && !conferencia.resumo && !conferencia.form && !conferencia.texto && conferencia.listas && /^Conferir/.test(conferencia.titulo),
     JSON.stringify(conferencia));
   const tela = await p.avaliar(`({ avisos: [...document.querySelectorAll('#municipios textarea')].map(t => t.value),
     titulos: [...document.querySelectorAll('.mun-cab h3')].map(h => h.textContent),
     comunidades: camadaComunidades ? camadaComunidades.getLayers().length : 0, resumo: $('resumo').textContent.replace(/\\s+/g, ' ') })`);
   conferir('a mensagem da rádio de cada município é idêntica à da API (modelo da empresa)',
-    JSON.stringify(tela.avisos) === JSON.stringify(esperado.municipios.map(m => m.mensagem)) && esperado.municipios.every(m => /^Atenção, ouvintes\./.test(m.mensagem)),
+    JSON.stringify(tela.avisos) === JSON.stringify(esperado.municipios.map(m => m.mensagem)) && esperado.municipios.every(m => /^Pessoal de /.test(m.mensagem)),
     `\n  tela: ${JSON.stringify(tela.avisos)}\n  API:  ${JSON.stringify(esperado.municipios.map(m => m.mensagem))}`);
   conferir('municípios na ordem da API', JSON.stringify(tela.titulos) === JSON.stringify(esperado.municipios.map(m => `${m.nome}/${m.uf}`)), JSON.stringify(tela.titulos));
   conferir('mapa: comunidades afetadas desenhadas', tela.comunidades >= 8, String(tela.comunidades));
@@ -299,10 +272,16 @@ const ucs = readFileSync(PLANILHA, 'utf-8').split(/\r?\n/).slice(1).filter(Boole
   conferir('aviso gerado: "Solicitado por" com o nome e o perfil do login, o código de verificação e o tipo',
     /^Solicitado por Operador da EMG \(Operador\) em \d{2}\/\d{2}\/\d{4} às \d{2}:\d{2} · código de verificação FRL-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}Tipo: Poda de árvores/.test(sol), sol);
   const avisos = await p.avaliar(`({ passo: estado.passo, resumo: ${visivel('resumo')}, texto: !!document.querySelector('#municipios textarea')?.offsetParent,
-    novo: ${visivel('novoAviso')}, titulo: $('tituloResultado').textContent })`);
-  conferir('funil: passo 5 (avisos) mostra o texto para a rádio e o "Novo desligamento"',
-    avisos.passo === 5 && !avisos.resumo && avisos.texto && avisos.novo && /^Avisos para a rádio/.test(avisos.titulo), JSON.stringify(avisos));
+    novo: ${visivel('novoAviso')}, envio: !!document.querySelector('#municipios .envio-radio')?.offsetParent, titulo: $('tituloResultado').textContent })`);
+  conferir('funil: passo 4 da tela (avisos) mostra o texto para a rádio, sem o envio e sem o "Novo desligamento"',
+    avisos.passo === 5 && !avisos.resumo && avisos.texto && !avisos.novo && !avisos.envio && /^Avisos para a rádio/.test(avisos.titulo), JSON.stringify(avisos));
   await captura(p, '2c_avisos.png');
+  await p.avaliar(`($('avancarResultado').click(), 0)`);
+  const envio = await p.avaliar(`({ passo: estado.passo, texto: !!document.querySelector('#municipios textarea')?.offsetParent, pacote: !!document.querySelector('#municipios .pacote-envio')?.offsetParent,
+    envio: !!document.querySelector('#municipios .envio-radio')?.offsetParent, novo: ${visivel('novoAviso')}, titulo: $('tituloResultado').textContent })`);
+  conferir('funil: passo 5 da tela (enviar) mostra o que vai para a rádio e o envio, sem o texto editável, com o "Novo desligamento"',
+    envio.passo === 6 && !envio.texto && envio.pacote && envio.envio && envio.novo && /^Enviar para a rádio/.test(envio.titulo), JSON.stringify(envio));
+  await captura(p, '2c_envio.png');
   await p.avaliar(`($('verComparativo').click(), 0)`);
   await ate(p, `estado.vista === 'comparativo' && document.querySelector('#comparativo .comp')`);
   const comp = await p.avaliar(`({ textos: [...document.querySelectorAll('#comparativo .comp')].map(c => [...c.querySelectorAll('.texto-longo')].map(t => t.textContent)),
@@ -338,8 +317,8 @@ const ucs = readFileSync(PLANILHA, 'utf-8').split(/\r?\n/).slice(1).filter(Boole
 
   // copiloto de IA (simulado nos testes): reescreve, o servidor confere, e "Desfazer edição" volta ao aviso da API
   const ia0 = await p.avaliar(`({ aviso: $('aviso-${cod}').value, botoes: document.querySelectorAll('[data-acao=ia][data-codigo="${cod}"]').length,
-    rotulo: document.querySelector('#municipios .copiloto .ajuda')?.textContent })`);
-  conferir('copiloto: botões dos pedidos e o aviso de que a IA é simulada', ia0.botoes === 5 && /simulado/.test(ia0.rotulo || ''), JSON.stringify(ia0));
+    rotulo: document.querySelector('#municipios .copiloto summary')?.textContent })`);
+  conferir('copiloto: botões dos pedidos num bloco recolhido "Ajustar o texto com IA", sem a palavra "simulado"', ia0.botoes === 5 && /Ajustar o texto com IA/.test(ia0.rotulo || '') && !/simulad/i.test(ia0.rotulo || ''), JSON.stringify(ia0));
   await p.avaliar(`(document.querySelector('[data-acao=ia][data-pedido=curto][data-codigo="${cod}"]').click(), 0)`);
   await ate(p, `/Verificado|Recusado/.test($('ia-status-${cod}').textContent)`);
   const ia1 = await p.avaliar(`({ texto: $('aviso-${cod}').value, status: $('ia-status-${cod}').textContent, estado: estado.avisos['${cod}'] })`);
@@ -406,8 +385,8 @@ const ucs = readFileSync(PLANILHA, 'utf-8').split(/\r?\n/).slice(1).filter(Boole
   // o Admin cadastra; valor e economia; WhatsApp e cópia (e-mail desligado aqui)
   const semRadio = await p.avaliar(`document.querySelector('#envio-${cod} .alerta-amarelo')?.textContent || ''`);
   conferir('envio: sem rádio cadastrada, o alerta lista as comunidades', /Sem rádio cadastrada para: .+\(.+\)/.test(semRadio), semRadio.slice(0, 120));
-  conferir('envio (Operador): sem rádio, nada de "+ Nova rádio"; pede o cadastro ao Admin', await p.avaliar(`!document.querySelector('#envio-${cod} select[data-envio=radioId]')
-    && /peça o cadastro ao Admin/.test($('envio-${cod}').textContent) && !!document.querySelector('#envio-${cod} [data-envio-acao=pedir]')`));
+  conferir('envio (Operador): sem rádio, nada de "+ Nova rádio" nem pedido de cadastro; só diz para pedir ao Admin', await p.avaliar(`!document.querySelector('#envio-${cod} select[data-envio=radioId]')
+    && /peça o cadastro ao Admin/.test($('envio-${cod}').textContent) && !document.querySelector('#envio-${cod} [data-envio-acao=pedir]')`));
   await fetch(`${BASE}/api/radios`, { method: 'POST', headers: { cookie, origin: BASE, 'Content-Type': 'application/json' }, body: JSON.stringify({
     nome: 'Rádio Leopoldina FM (demonstração)', email: 'leopoldina.fm@example.com', whatsapp: '(32) 99999-0001', valor_padrao: '150,00', cobranca: 'minuto',
     alcance: { municipios: [cod] } }) });
@@ -423,15 +402,17 @@ const ucs = readFileSync(PLANILHA, 'utf-8').split(/\r?\n/).slice(1).filter(Boole
   const previaFechado = await p.avaliar(`$('previa-${cod}').textContent`);
   conferir('valor fechado sem o custo antigo: a prévia não inventa economia', /Economia: preencha "Quanto custaria do jeito antigo" para calcular/.test(previaFechado), previaFechado);
   await p.avaliar(`(() => { const i = document.querySelector('#envio-${cod} [data-envio=cobranca]'); i.value = 'minuto'; i.dispatchEvent(new Event('change', { bubbles: true })); return 0; })()`);
-  await p.avaliar(`(window.__aberto = [], window.open = u => { window.__aberto.push(u); return null; }, window.confirm = () => true,
-    navigator.clipboard.writeText = async () => {}, document.querySelector('#envio-${cod} [data-envio-acao=whatsapp]').click(), 0)`);
-  await ate(p, `/WhatsApp aberto/.test($('estado').textContent) && document.querySelectorAll('#envio-${cod} .envios li').length === 1`);
-  const wa = await p.avaliar(`window.__aberto[0] || ''`);
-  conferir('WhatsApp: abre wa.me com o número da rádio e a mensagem; o envio fica na lista com valor e economia',
-    wa.startsWith('https://wa.me/5532999990001?text=Aten%C3%A7%C3%A3o%2C%20ouvintes.') && /Economia: R\$\s?[\d.,]+ pelo tempo a menos no ar/.test(await p.avaliar(`$('envio-${cod}').textContent`)), wa.slice(0, 80));
-  await p.avaliar(`(document.querySelector('#envio-${cod} [data-envio-acao=copia]').click(), 0)`);
-  await ate(p, `document.querySelectorAll('#envio-${cod} .envios li').length === 2`);
-  conferir('copiar a mensagem: o envio fica registrado', /cópia da mensagem/.test(await p.avaliar(`$('envio-${cod}').textContent`)));
+  await p.avaliar(`(document.querySelector('#envio-${cod} [data-envio-acao=whatsapp]').click(), 0)`);
+  await ate(p, `!!document.querySelector('dialog.zap[open]')`);
+  const zap = await p.avaliar(`({ nome: document.querySelector('.zap-topo strong').textContent, numero: document.querySelector('.zap-topo small').textContent,
+    texto: document.querySelector('.zap-texto').textContent, anexos: document.querySelectorAll('.zap-anexo').length, simulado: /simulad/i.test(document.querySelector('dialog.zap').textContent) })`);
+  conferir('WhatsApp: a janela mostra a conversa (rádio, número, texto da mensagem e anexos), sem a palavra "simulado"',
+    zap.numero === '32999990001' && /^Pessoal de /.test(zap.texto) && zap.anexos >= 1 && !zap.simulado, JSON.stringify(zap).slice(0, 200));
+  await p.avaliar(`(document.querySelector('#zapEnviar').click(), 0)`);
+  await ate(p, `/WhatsApp enviado/.test($('estado').textContent) && document.querySelectorAll('#envio-${cod} .envios li').length === 1`);
+  conferir('WhatsApp: o envio fica na lista com valor e economia',
+    /Economia: R\$\s?[\d.,]+ pelo tempo a menos no ar/.test(await p.avaliar(`$('envio-${cod}').textContent`)) && await p.avaliar(`!document.querySelector('dialog.zap')`));
+  conferir('Copiar mensagem e Pedir cadastro de rádio saíram da tela de envio', await p.avaliar(`!document.querySelector('#envio-${cod} [data-envio-acao=copia]') && !document.querySelector('#envio-${cod} [data-envio-acao=pedir]')`));
   await captura(p, '2e_envio_radio.png');
   await p.avaliar(`($('novoAviso').click(), 0)`);
   conferir('Novo desligamento: volta ao passo 1, sem o resultado anterior na tela nem no mapa', await p.avaliar(`estado.passo === 1
@@ -502,8 +483,8 @@ const ucs = readFileSync(PLANILHA, 'utf-8').split(/\r?\n/).slice(1).filter(Boole
     && /Economizado/.test(mesDash) && /No prazo/.test(mesDash), mesDash.slice(0, 200));
   await captura(p, '6_dashboard.png');
   // "Pergunte ao painel" (IA simulada nos testes): a pergunta vira consulta e a tabela vem do histórico
-  conferir('pergunte ao painel: cartão visível com a IA simulada e os exemplos', await p.avaliar(`!$('perguntaPainel').hidden
-    && /simulada/.test($('perguntaAjuda').textContent) && document.querySelectorAll('#exemplosPergunta button').length === estado.config.ia.perguntas_exemplo.length`));
+  conferir('pergunte ao painel: cartão visível, sem a palavra "simulada", e os exemplos', await p.avaliar(`!$('perguntaPainel').hidden
+    && !/simulad/i.test($('perguntaAjuda').textContent) && document.querySelectorAll('#exemplosPergunta button').length === estado.config.ia.perguntas_exemplo.length`));
   await p.avaliar(`($('textoPergunta').value = 'Quais municípios tiveram mais avisos?', $('botaoPergunta').click(), 0)`);
   await ate(p, `document.querySelector('#respostaPergunta .tabela-pergunta')`);
   const perg = await p.avaliar(`({ texto: document.querySelector('#respostaPergunta .resposta-texto')?.textContent,
@@ -565,7 +546,7 @@ const ucs = readFileSync(PLANILHA, 'utf-8').split(/\r?\n/).slice(1).filter(Boole
   const p = await abrir(`${BASE}/`, { largura: 1440, altura: 900 });
   const c = await entrarNaTela(p, 'consulta@emg.example', SENHAS['consulta@emg.example']);
   await ate(p, `document.querySelectorAll('#painelDash .kpi').length > 0`);
-  conferir('Consulta: Mapa, Histórico e Relatórios; abre no Mapa', c.tela === 'app' && c.abas.join(',') === 'Mapa,Histórico,Relatórios'
+  conferir('Consulta: Mapa, Histórico e Análises; abre no Mapa', c.tela === 'app' && c.abas.join(',') === 'Mapa,Histórico,Análises'
     && await p.avaliar(`estado.vista === 'painel' && !$('vista-painel').hidden`), JSON.stringify(c));
   await p.avaliar(`irPara('historico')`);
   await ate(p, `document.querySelectorAll('#listaHistorico [data-historico]').length`);
@@ -579,15 +560,7 @@ const ucs = readFileSync(PLANILHA, 'utf-8').split(/\r?\n/).slice(1).filter(Boole
   await ate(p, `document.querySelectorAll('.envio-radio .envios li').length || document.querySelectorAll('[data-historico]').length > 1`);
   const envCon = await p.avaliar(`({ lista: document.querySelectorAll('.envio-radio .envios li').length, form: document.querySelectorAll('.envio-radio select, [data-envio-acao]').length })`);
   conferir('Consulta: vê os envios do aviso, sem o formulário de envio', envCon.form === 0, JSON.stringify(envCon));
-  await p.navegador.send('Browser.setDownloadBehavior', { behavior: 'allow', downloadPath: CAP, eventsEnabled: true });
-  let nomeComp = '';
-  p.navegador.on('Browser.downloadWillBegin', e => { if (/comprovante/.test(e.suggestedFilename)) nomeComp = e.suggestedFilename; });
-  await p.avaliar(`($('baixarComprovante').click(), 0)`);
-  await ate(p, `/Comprovante do aviso nº \\d+ baixado/.test($('estado').textContent)`);
-  await espera(600);
-  const comp = nomeComp ? textoDoPdf(readFileSync(join(CAP, nomeComp))) : '';
-  conferir('Consulta: baixa o comprovante do aviso (PDF com quem pediu, envios e o código)', /Comprovante do aviso nº \d+/.test(comp)
-    && /Solicitado por/.test(comp) && /Envios às rádios/.test(comp) && /Gerado por Consulta da EMG \(Consulta\)/.test(comp), `${nomeComp} ${comp.slice(0, 160)}`);
+  conferir('Comprovante e Linha do tempo saíram da tela (ficam só na auditoria)', await p.avaliar(`!$('baixarComprovante') && !$('verLinhaTempo')`));
   conferir('Consulta: nenhum ponto de UC no mapa', await p.avaliar(`!camadaUcs && $('botaoUcs').closest('li').hidden`));
   conferir('Consulta: a API recusa gerar aviso (403)', await p.avaliar(`fetch('/api/avisos', { method: 'POST' }).then(r => r.status === 403)`));
   const semAudio = await p.avaliar(`(() => { desenharComparativo();
@@ -598,8 +571,8 @@ const ucs = readFileSync(PLANILHA, 'utf-8').split(/\r?\n/).slice(1).filter(Boole
   await p.avaliar(`($('sair').click(), 0)`); await ate(p, `estado.tela === 'entrar'`);
 
   const a = await entrarNaTela(p, 'admin@emg.example', SENHAS['admin@emg.example']);
-  conferir('Admin da empresa: Novo aviso, Histórico, Relatórios, Usuários, Rádios, Configurações e Auditoria',
-    a.abas.join(',') === 'Novo aviso,Histórico,Relatórios,Usuários,Rádios,Configurações,Auditoria', JSON.stringify(a.abas));
+  conferir('Admin da empresa: Novo aviso, Histórico, Análises, Usuários, Rádios, Configurações e Auditoria',
+    a.abas.join(',') === 'Novo aviso,Histórico,Análises,Usuários,Rádios,Configurações,Auditoria', JSON.stringify(a.abas));
   await p.avaliar(`irPara('usuarios')`);
   await ate(p, `document.querySelectorAll('#listaUsuarios [data-usuario]').length >= 3`);
   await p.avaliar(`($('novoNome').value = 'Maria Operadora', $('novoEmail').value = 'maria@emg.example', $('novoPerfil').value = 'operador', $('formUsuario').requestSubmit(), 0)`);
@@ -657,7 +630,7 @@ const ucs = readFileSync(PLANILHA, 'utf-8').split(/\r?\n/).slice(1).filter(Boole
   await ate(p, `$('cfgModelo').value.includes('{comunidades}')`);
   await p.avaliar(`(() => { const t = $('cfgTelefone'); t.value = '0800 000 0000'; t.dispatchEvent(new Event('input', { bubbles: true })); return 0; })()`);
   const previa = await p.avaliar(`$('cfgPrevia').textContent`);
-  conferir('Configurações: prévia da mensagem pelo modelo (com o telefone novo)', /^Exemplo: Atenção, ouvintes\./.test(previa) && /Dúvidas: 0800 000 0000\.$/.test(previa), previa);
+  conferir('Configurações: prévia da mensagem pelo modelo padrão da Energisa (sem telefone no texto)', /^Exemplo: Pessoal de Leopoldina,/.test(previa) && /Qualquer dúvida, entre em contato pelo site, WhatsApp ou app\.$/.test(previa) && !previa.includes('0800'), previa);
   await p.avaliar(`($('formConfig').requestSubmit(), 0)`);
   await ate(p, `/Configurações salvas/.test($('estadoConfig').textContent)`);
   await p.avaliar(`(() => { $('cfgModelo').value = 'no dia {data} {cliente}'; $('formConfig').requestSubmit(); return 0; })()`);
@@ -690,7 +663,7 @@ const ucs = readFileSync(PLANILHA, 'utf-8').split(/\r?\n/).slice(1).filter(Boole
   await p.avaliar(`($('botaoTema').click(), 0)`);
   const tema = await p.avaliar(`({ tema: document.documentElement.dataset.tema, fundo: getComputedStyle(document.body).backgroundColor,
     botao: $('botaoTema').textContent, mapa: [...document.querySelectorAll('.leaflet-tile')].some(t => t.src.includes('Dark_Gray')) })`);
-  conferir('tema escuro: Noite no fundo, botão "Tema claro" e o fundo do mapa escuro', tema.tema === 'escuro' && tema.fundo === 'rgb(11, 27, 43)'
+  conferir('tema escuro: verde-escuro no fundo, botão "Tema claro" e o fundo do mapa escuro', tema.tema === 'escuro' && tema.fundo === 'rgb(14, 27, 29)'
     && tema.botao === 'Tema claro' && tema.mapa, JSON.stringify({ antes, ...tema }));
   const pequenosTemas = [];
   for (const v of ['aviso', 'historico', 'relatorios', 'usuarios', 'radios', 'configuracoes', 'registro']) {

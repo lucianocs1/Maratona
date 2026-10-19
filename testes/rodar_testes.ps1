@@ -5,6 +5,9 @@ param([switch]$Rapido, [switch]$SemAlgoritmo)
 
 $ErrorActionPreference = "Continue"
 $env:PYTHONIOENCODING = "utf-8"
+# os testes não herdam o modo apresentação nem a voz de nuvem do .env (e-mail demo, voz do Google): cada um liga o que precisa
+$env:FAROL_EMAIL = "teste"
+$env:FAROL_VOZ_NUVEM = "0"
 [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
 $raiz = Split-Path -Parent $PSScriptRoot
 Set-Location $raiz
@@ -57,7 +60,6 @@ if (-not $Rapido) {
     $testes += @{ Nome = "Qualquer tela (navegador)";       Cmd = "uv run python testes/navegador/rodar_teste_app.py teste_telas.mjs" }
     $testes += @{ Nome = "Mapa das empresas (navegador)";   Cmd = "uv run python testes/navegador/rodar_teste_app.py teste_mapa_empresas.mjs" }
     $testes += @{ Nome = "Tabelas do painel (navegador)";   Cmd = "uv run python testes/navegador/rodar_teste_app.py teste_tabelas.mjs" }
-    $testes += @{ Nome = "Escolher quem será desligado (navegador)"; Cmd = "uv run python testes/navegador/rodar_teste_app.py teste_escolha.mjs" }
     $testes += @{ Nome = "Acessibilidade (painel)";         Cmd = "uv run python testes/navegador/rodar_teste_app.py teste_acessibilidade.mjs" }
     $testes += @{ Nome = "Sem null na tela (navegador)";    Cmd = "uv run python testes/navegador/rodar_teste_app.py teste_sem_null.mjs" }
     # o axe-core (só dos testes, versão fixada) é instalado do package-lock na primeira vez

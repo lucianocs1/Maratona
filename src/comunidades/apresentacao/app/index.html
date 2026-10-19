@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#0E1620">
+<meta name="theme-color" content="#1B8A8A">
 <title>Norte · Aviso de desligamento</title>
 <link rel="icon" type="image/svg+xml" href="/assets/marca/farol-pequeno.svg">
 <link rel="manifest" href="/assets/app/farol.webmanifest">
@@ -23,7 +23,6 @@
     <img src="/assets/marca/farol.svg" alt="" width="40" height="40">
     <div><p class="nome">Norte</p><p class="slogan" data-t>O aviso certo, para a comunidade certa</p></div>
   </div>
-  <p class="faixa" id="faixa" data-t>Demonstração: rede elétrica e clientes fictícios; território e comunidades reais (IBGE, Censo 2022).</p>
   <div class="topo-acoes">
     <button type="button" id="botaoConta" class="conta-botao" aria-haspopup="true" aria-expanded="false" aria-controls="menuConta">
       <svg class="icone-menu" aria-hidden="true" focusable="false" width="20" height="20" viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>
@@ -80,24 +79,29 @@
   </form>
 </main>
 
+<div id="progresso" class="progresso" aria-hidden="true"><span></span></div>
+<div id="carregando" class="carregando" role="status" aria-live="polite" hidden>
+  <div class="carregando-cartao"><span class="spinner" aria-hidden="true"></span><p id="carregandoTexto"></p><p class="ajuda" id="carregandoDica"></p></div>
+</div>
+
 <main id="telaApp" class="layout" hidden>
   <section class="painel" aria-label="Painel" data-t-aria-label="Painel">
-    <button type="button" id="botaoAmpliar" class="botao-ampliar" aria-pressed="false" aria-controls="telaApp"><span aria-hidden="true">⇔</span> <span id="botaoAmpliarTexto">Ampliar painel</span></button>
+    <button type="button" id="botaoAmpliar" class="botao-ampliar" aria-pressed="false" aria-controls="telaApp" title="Ampliar painel"><svg id="iconeAmpliar" aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/></svg><span id="botaoAmpliarTexto" class="visualmente-oculto">Ampliar painel</span></button>
     <button type="button" id="botaoMenu" class="botao-menu" aria-expanded="false" aria-controls="abas"><span aria-hidden="true">☰</span> <span data-t>Menu</span> <span id="menuAtual" class="menu-atual"></span></button>
     <nav class="abas" id="abas" aria-label="Seções" data-t-aria-label="Seções"></nav>
     <nav class="subabas" id="subabas" aria-label="Relatórios" data-t-aria-label="Relatórios" hidden></nav>
 
     <p id="estado" class="estado" role="status" aria-live="polite"></p>
 
-    <!-- Novo desligamento: funil em 5 passos (planilha, quando, escolher quem será desligado, conferir e avisos) -->
+    <!-- Novo desligamento: funil de 5 passos (planilha, quando, conferir, avisos e enviar; o passo interno 3, escolher quem será desligado, não aparece) -->
     <section id="vista-aviso" class="vista" hidden aria-labelledby="titulo">
       <h1 id="titulo" data-t>Novo desligamento programado</h1>
       <ol class="funil" id="funil" aria-label="Passos do aviso" data-t-aria-label="Passos do aviso">
         <li><button type="button" data-passo="1"><span class="num">1</span><span class="rotulo-passo" data-t>Planilha</span></button></li>
         <li><button type="button" data-passo="2"><span class="num">2</span><span class="rotulo-passo" data-t>Quando</span></button></li>
-        <li><button type="button" data-passo="3"><span class="num">3</span><span class="rotulo-passo" data-t>Escolher</span></button></li>
-        <li><button type="button" data-passo="4"><span class="num">4</span><span class="rotulo-passo" data-t>Conferir</span></button></li>
-        <li><button type="button" data-passo="5"><span class="num">5</span><span class="rotulo-passo" data-t>Avisos</span></button></li>
+        <li><button type="button" data-passo="4"><span class="num">3</span><span class="rotulo-passo" data-t>Conferir</span></button></li>
+        <li><button type="button" data-passo="5"><span class="num">4</span><span class="rotulo-passo" data-t>Avisos</span></button></li>
+        <li><button type="button" data-passo="6"><span class="num">5</span><span class="rotulo-passo" data-t>Enviar</span></button></li>
       </ol>
       <form id="form" class="cartao" novalidate>
         <fieldset id="passo-1">
@@ -123,8 +127,6 @@
           <label id="tipoOutroRotulo" hidden><span data-t>Descreva o motivo (até 200 caracteres)</span>
             <input id="tipoOutro" maxlength="200" autocomplete="off" aria-describedby="tipoOutroAjuda"></label>
           <p class="ajuda" id="tipoOutroAjuda" hidden data-t>Entra na mensagem da rádio ("para …"). Não escreva nome de cliente, número de UC, CPF, telefone nem endereço.</p>
-          <label class="idioma"><span data-t>Idioma do aviso</span> <select id="idioma"></select></label>
-          <p class="ajuda" id="idiomaAudio" hidden></p>
           <label id="abaRotulo" hidden><span data-t>Aba da planilha (mais de uma tem as colunas)</span> <select id="aba"></select></label>
           <p class="ajuda" id="passo2Arquivo"></p>
         </fieldset>
@@ -188,7 +190,7 @@
 
     <!-- Relatórios: o do período (mensal), com filtros, PDF e CSV -->
     <section id="vista-relatorios" class="vista" hidden aria-labelledby="tituloRelatorios">
-      <h1 id="tituloRelatorios" data-t>Relatórios</h1>
+      <h1 id="tituloRelatorios" data-t>Relatório</h1>
       <p class="ajuda" data-t>Desligamentos, avisos, envios às rádios, custo, prazo e comunidades. Só números agregados: nenhuma UC nem nome de cliente. Cada relatório (na tela, em PDF, em CSV ou por e-mail) fica na auditoria com o seu nome; o PDF ganha um código de verificação e uma segunda via guardada.</p>
       <form id="formRelatorio" class="cartao filtros-relatorio" novalidate>
         <label><span data-t>Relatório</span> <select id="relQual">
@@ -239,34 +241,6 @@
       </section>
       <div id="comparativoTotal"></div>
       <div id="comparativo" class="lista"></div>
-    </section>
-
-    <!-- Simulador de economia: gasto mensal com rádio x parte cobrada por tempo x redução do tempo no ar (só o Admin da empresa altera os valores) -->
-    <section id="vista-simulador" class="vista" hidden aria-labelledby="tituloSimulador">
-      <h1 id="tituloSimulador" data-t>Simulador de economia</h1>
-      <p class="ajuda" data-t>Quanto a empresa economiza com rádio usando o aviso por comunidade: gasto mensal com rádio x parte cobrada por tempo x redução do tempo no ar (a média real dos avisos da empresa ou, sem avisos, a medição de validação). Só números agregados.</p>
-      <form id="formSimulador" class="cartao formulario" novalidate hidden>
-        <h2 id="simFormTitulo" data-t>Valores da empresa</h2>
-        <p class="ajuda" id="simAjuda" data-t>Só o Admin da empresa altera estes valores; a mudança fica na auditoria com o antes e o depois. Operador e Consulta veem o resultado.</p>
-        <label><span data-t>Gasto mensal com rádio, em R$ (ou o mínimo da faixa)</span> <input type="number" id="simGastoMin" min="0" step="0.01" inputmode="decimal" required aria-describedby="simAjuda"></label>
-        <label><span data-t>Máximo da faixa, em R$ (opcional)</span> <input type="number" id="simGastoMax" min="0" step="0.01" inputmode="decimal"></label>
-        <label><span data-t>Parte do gasto cobrada por tempo no ar (%)</span> <input type="number" id="simPct" min="0" max="100" step="1" inputmode="decimal" required></label>
-        <label><span data-t>Origem dos valores (opcional, ex.: valores informados pela distribuidora)</span> <input id="simNota" maxlength="120" autocomplete="off"></label>
-        <div class="acoes">
-          <button type="button" id="simConservador" data-t>Cenário conservador (50%)</button>
-          <button type="submit" id="simSalvar" class="prim" data-t>Salvar</button>
-        </div>
-        <p id="estadoSimulador" class="estado" role="status" aria-live="polite"></p>
-      </form>
-      <form id="formSimPeriodo" class="cartao filtros-relatorio" novalidate>
-        <label><span data-t>Avisos do período</span> <select id="simPeriodo"></select></label>
-        <div class="acoes">
-          <button type="submit" class="prim" data-t>Ver o simulador</button>
-          <button type="button" data-sim="pdf" data-t>Baixar PDF</button>
-          <button type="button" data-sim="csv" data-t>Baixar CSV</button>
-        </div>
-      </form>
-      <div id="simulador" class="relatorio"></div>
     </section>
 
     <!-- Resultado (de um aviso novo ou do histórico): a tela o põe no lugar da vista de onde veio -->
@@ -339,7 +313,6 @@
       <h1 id="tituloConfig" data-t>Configurações da empresa</h1>
       <form id="formConfig" class="cartao formulario" novalidate>
         <h2 data-t>Mensagem da rádio</h2>
-        <label><span data-t>Idioma padrão do aviso</span> <select id="cfgIdioma"></select></label>
         <label><span data-t>Modelo da mensagem em português</span> <textarea id="cfgModelo" rows="6" maxlength="1500" lang="pt-BR"></textarea></label>
         <p class="previa" id="cfgPrevia" lang="pt-BR" aria-live="polite"></p>
         <label><span data-t>Modelo da mensagem em inglês</span> <textarea id="cfgModeloEn" rows="5" maxlength="1500" lang="en"></textarea></label>
@@ -449,12 +422,12 @@
       <label><span data-t>Estado</span> <select id="filtroUf"></select></label>
       <label><span data-t>Município</span> <select id="filtroMunicipio"></select></label>
     </form>
-    <ul class="legenda" id="legenda" aria-label="Camadas do mapa" data-t-aria-label="Camadas do mapa">
+    <ul class="legenda" id="legenda" aria-label="Legenda do mapa" data-t-aria-label="Legenda do mapa">
       <li class="legenda-topo"><button type="button" id="botaoLegenda" aria-expanded="true" aria-controls="legenda">
-        <span aria-hidden="true" class="seta">▾</span> <span id="botaoLegendaTexto">Camadas</span></button></li>
+        <span aria-hidden="true" class="seta">▾</span> <span id="botaoLegendaTexto">Legenda</span></button></li>
       <li class="camada" id="camadaComunidades">
         <div class="camada-cab">
-          <button type="button" role="switch" aria-checked="true" id="botaoComunidades" class="interruptor"><span class="trilho" aria-hidden="true"><span class="bola"></span></span><span data-t>Contornos das comunidades</span></button>
+          <span class="camada-titulo" data-t>Comunidades</span>
           <button type="button" class="expandir" data-expandir="legendaComunidades" aria-expanded="false" aria-controls="legendaComunidades" aria-label="Mostrar ou esconder a legenda" data-t-aria-label="Mostrar ou esconder a legenda"><span aria-hidden="true" class="seta">▾</span></button>
         </div>
         <ul class="camada-legenda" id="legendaComunidades">
@@ -466,12 +439,6 @@
           <li><span class="amostra outra"></span><span data-t>Outras comunidades</span></li>
         </ul>
         <p class="camada-dica" id="dica_botaoComunidades" role="status" hidden></p>
-      </li>
-      <li class="camada" id="camadaNomes">
-        <div class="camada-cab">
-          <button type="button" role="switch" aria-checked="true" id="botaoNomes" class="interruptor"><span class="trilho" aria-hidden="true"><span class="bola"></span></span><span data-t>Nomes dos lugares</span></button>
-        </div>
-        <p class="camada-dica" id="dica_botaoNomes" role="status" hidden></p>
       </li>
       <li class="camada" id="camadaRede">
         <div class="camada-cab">
@@ -500,25 +467,6 @@
           <li class="legenda-densidade"><span class="escala escala-clientes" aria-hidden="true"></span><span data-t>De longe: poucos a muitos clientes por quadradinho</span></li>
         </ul>
         <p class="camada-dica" id="dica_botaoClientes" role="status" hidden></p>
-      </li>
-      <li class="camada" id="camadaLocalidades">
-        <div class="camada-cab">
-          <button type="button" role="switch" aria-checked="false" id="botaoLocalidades" class="interruptor"><span class="trilho" aria-hidden="true"><span class="bola"></span></span><span data-t>Localidades oficiais (IBGE)</span></button><span class="contagem" id="contagemLocalidades" hidden></span>
-          <button type="button" class="expandir" data-expandir="legendaLocalidades" aria-expanded="false" aria-controls="legendaLocalidades" aria-label="Mostrar ou esconder a legenda" data-t-aria-label="Mostrar ou esconder a legenda"><span aria-hidden="true" class="seta">▾</span></button>
-        </div>
-        <ul class="camada-legenda" id="legendaLocalidades">
-          <li><span class="amostra loc-sede"></span><span data-t>Cidade e vila</span></li>
-          <li><span class="amostra loc-povoado"></span><span data-t>Povoado, núcleo e lugarejo</span></li>
-          <li><span class="amostra loc-outras"></span><span data-t>Outras localidades e quilombolas</span></li>
-          <li class="legenda-densidade"><span data-t>Os nomes oficiais do IBGE (Censo 2022); passe o mouse ou toque num ponto para ver o nome.</span></li>
-        </ul>
-      </li>
-      <li class="camada" id="itemCalor" hidden>
-        <div class="camada-cab">
-          <button type="button" role="switch" aria-checked="false" id="botaoCalor" class="interruptor"><span class="trilho" aria-hidden="true"><span class="bola"></span></span><span data-t>Mapa de calor (12 meses)</span></button>
-        </div>
-        <span id="legendaCalor" class="legenda-calor" hidden><span>1</span><span class="escala" aria-hidden="true"></span>
-          <span id="calorMax"></span> <span data-t>desligamento(s) por comunidade · clique numa comunidade para ver a ficha</span></span>
       </li>
       <li class="camada legenda-ucs" hidden>
         <div class="camada-cab">

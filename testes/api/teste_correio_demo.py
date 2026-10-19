@@ -10,6 +10,7 @@ import sys
 from email.message import EmailMessage
 
 os.environ.pop("FAROL_EMAIL_REAL", None)
+os.environ["FAROL_EMAIL"] = "teste"   # não herda o FAROL_EMAIL=demo do .env
 os.environ.update({"FAROL_SMTP_HOST": "127.0.0.1", "FAROL_SMTP_PORTA": "9", "FAROL_SMTP_SEGURANCA": "nenhuma"})
 
 from comunidades import correio  # noqa: E402
@@ -43,6 +44,22 @@ for destino, campo in [("carlos@energisa.com.br", "To"), ("radio@example.com, fu
     conferir(f"domínio real em {campo} ({destino}): recusado", recusado)
 conferir("nenhuma conexão ao servidor de e-mail foi aberta para esses envios", not conexoes, str(conexoes))
 socket.create_connection = original
+
+# modo apresentação (FAROL_EMAIL=demo): o e-mail é aceito para qualquer endereço, mas não entregue a ninguém (nenhuma conexão)
+os.environ["FAROL_EMAIL"] = "demo"
+conexoes.clear()
+socket.create_connection = lambda *a, **k: conexoes.append(a) or original(*a, **k)
+m = EmailMessage()
+m["To"] = "radio@gmail.com"
+m["Subject"] = "teste"
+try:
+    correio.enviar(m)
+    aceito = True
+except correio.FalhaEnvio:
+    aceito = False
+conferir("modo demo: endereço real é aceito e nada é entregue (nenhuma conexão)", aceito and not conexoes and correio.ligado(), str(conexoes))
+socket.create_connection = original
+os.environ["FAROL_EMAIL"] = "teste"
 
 for r in resultados:
     print(r[0], r[1], f"-> {r[2]}" if r[0] != "OK  " and r[2] else "")

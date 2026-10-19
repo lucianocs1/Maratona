@@ -16,9 +16,10 @@ from . import idiomas
 
 CAMPOS = ("distribuidora", "municipio", "data", "inicio", "fim", "motivo", "comunidades", "comunidades_parciais",
           "telefone_atendimento", "codigo")
-PADRAO = ("Atenção, ouvintes. A {distribuidora} informa: no dia {data}, das {inicio} às {fim}, haverá desligamento "
-          "programado de energia para {motivo}[ nas comunidades {comunidades}].[ Ficará sem energia parte de: "
-          "{comunidades_parciais}.] Programe-se.[ Dúvidas: {telefone_atendimento}.]")
+# o padrão da Energisa (mensagem que a empresa já usa); no lugar da lista de endereços, as comunidades
+PADRAO = ("Pessoal de {municipio}, no dia {data}, das {inicio} às {fim}, vamos precisar desligar a energia da sua região"
+          "[ para {motivo}].[ Comunidades: {comunidades}.][ Parte de: {comunidades_parciais}.] "
+          "Não esqueça de tirar os aparelhos da tomada. Qualquer dúvida, entre em contato pelo site, WhatsApp ou app.")
 # um modelo por idioma (Fase K); a data e as horas entram no formato de cada um (nucleo/idiomas.data_falada e inicio_fim)
 PADROES = {
     "pt-BR": PADRAO,

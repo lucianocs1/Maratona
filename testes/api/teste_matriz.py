@@ -40,12 +40,13 @@ MATRIZ = {
     # o Admin do Norte tem o mapa das empresas (desde 15/10/2026)
     ("GET", "/api/municipios/{codigo}/comunidades"): EMPRESA, ("GET", "/api/municipios/{codigo}/rede"): EMPRESA,
     ("GET", "/api/clientes"): GERA, ("GET", "/api/clientes/resumo"): GERA,
+    ("GET", "/api/microrregioes"): EMPRESA,   # microrregiões do IBGE (dado público), só as que tocam a área da empresa
     ("GET", "/api/localidades-oficiais"): EMPRESA,   # localidades do IBGE (dado público), só a área da empresa   # clientes fictícios: só a área da empresa
     ("GET", "/api/verificar/{codigo}"): TODOS,
-    # importar, conferir, gerar, PDF, MP3, JSON com UCs: Admin da empresa e Operador
-    ("POST", "/api/planilha"): GERA, ("POST", "/api/avisos"): GERA, ("POST", "/api/planilha/json"): GERA,
+    # importar, conferir, gerar, PDF, MP3: Admin da empresa e Operador
+    ("POST", "/api/planilha"): GERA, ("POST", "/api/avisos"): GERA,
     ("POST", "/api/planilha/escolha"): GERA,   # escolher quem será desligado (nucleo/selecao.py)
-    ("POST", "/api/planilha/relatorio"): GERA, ("POST", "/api/audio"): GERA,
+    ("POST", "/api/audio"): GERA,
     ("PUT", "/api/historico/{id_}/municipios/{codigo}/texto"): GERA, ("POST", "/api/historico/{id_}/cancelar"): GERA,
     ("POST", "/api/historico/{id_}/data"): GERA, ("POST", "/api/historico/{id_}/municipios/{codigo}/pdf"): GERA,
     # histórico e dashboard da empresa: os três perfis da empresa

@@ -3,6 +3,8 @@
 FAROL_SMTP_HOST, FAROL_SMTP_PORTA, FAROL_SMTP_USUARIO, FAROL_SMTP_SENHA, FAROL_SMTP_REMETENTE e
 FAROL_SMTP_SEGURANCA (starttls, ssl ou nenhuma). Sem FAROL_SMTP_HOST, ou com FAROL_EMAIL=0, o envio por
 e-mail fica desligado.
+FAROL_EMAIL=demo: modo apresentação, sem servidor de e-mail: o envio é registrado e o PDF e o MP3 são gerados e
+guardados, mas nada é entregue a ninguém (só valem destinos de teste, .example).
 Localmente, o Mailpit (caixa de teste em 127.0.0.1:1025, nada sai para a internet):
   FAROL_SMTP_HOST=127.0.0.1, FAROL_SMTP_PORTA=1025, FAROL_SMTP_SEGURANCA=nenhuma.
 A senha do SMTP nunca vai para o código, o git ou o log.
@@ -23,7 +25,14 @@ class FalhaEnvio(RuntimeError):
     """O servidor de e-mail recusou ou não respondeu (a mensagem é curta e sem a senha)."""
 
 
+def demo() -> bool:
+    return (segredo("FAROL_EMAIL") or "").lower() == "demo"
+
+
 def configuracao() -> dict | None:
+    if demo():
+        return {"host": "", "porta": 0, "usuario": None, "senha": None, "seguranca": "nenhuma",
+                "remetente": segredo("FAROL_SMTP_REMETENTE") or "Norte <avisos@farol.example>"}
     host = segredo("FAROL_SMTP_HOST")
     if not host or os.environ.get("FAROL_EMAIL") == "0":
         return None
@@ -55,6 +64,8 @@ def enviar(msg: EmailMessage) -> None:
     """Entrega a mensagem ao servidor de e-mail; FalhaEnvio se ele recusar algum destinatário ou falhar.
     Demonstração (sem FAROL_EMAIL_REAL=1): só para domínios de teste (.example etc.), conferido antes de conectar;
     um domínio real nunca recebe nada dos dados fictícios."""
+    if demo():
+        return   # apresentação: o e-mail foi montado e registrado, mas não há para onde entregar (nem para endereço real)
     if os.environ.get("FAROL_EMAIL_REAL") != "1":
         destinos = [a for _, a in getaddresses(msg.get_all("To", []) + msg.get_all("Cc", []) + msg.get_all("Bcc", []))]
         if any(destino_real(a) for a in destinos):

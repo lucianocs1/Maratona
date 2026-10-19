@@ -39,7 +39,7 @@ os.environ.update({"FAROL_ESQUEMA": "teste_relatorios_h", "FAROL_SMTP_HOST": "12
                    "FAROL_SMTP_SEGURANCA": "nenhuma", "FAROL_SMTP_REMETENTE": "Norte <avisos@farol.example>",
                    "FAROL_URL_PUBLICA": "http://farol.teste",
                    "FAROL_CHAVE_ARQUIVOS": base64.urlsafe_b64encode(os.urandom(32)).decode()})
-os.environ.pop("FAROL_EMAIL", None)
+os.environ["FAROL_EMAIL"] = "smtp"   # o .env pode ter "demo"; aqui o envio é de verdade, para o Mailpit
 
 from fastapi.testclient import TestClient  # noqa: E402
 

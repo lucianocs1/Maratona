@@ -2,7 +2,7 @@
 // de 320, 400, 600 e 640 px (640 = 1280 px com zoom de 200%) e o painel lateral do computador (1280), em pt-BR, en e es:
 // nenhum cabeçalho com mais de 2 linhas, nenhuma palavra quebrada no meio, tabela de até 3 colunas sem barra de rolagem,
 // a página sem rolagem horizontal, nenhum True/False/None/null na tela; e o "Ampliar painel" (60%, Esc volta, fica no perfil).
-// Também os cartões do simulador de economia (sem gasto e preenchido) em 320, 768, 1280 e 640 px (zoom de 200%).
+// (O simulador de economia saiu da tela em 18/10/2026.)
 // Rode pelo executor: uv run python testes/navegador/rodar_teste_app.py teste_tabelas.mjs
 import { readFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
@@ -182,48 +182,6 @@ for (const [email, telas] of Object.entries(TELAS)) {
     conferir('Esc volta ao painel normal', !(await p.avaliar(`estado.painelAmplo`)) && await largura() <= antes + 2);
     conferir('só o painel rola: a página não rola e o cabeçalho fica no lugar', await p.avaliar(`(() => document.documentElement.scrollHeight <= innerHeight + 1 && getComputedStyle(document.body).overflow === 'hidden'
       && document.querySelector('.topo').getBoundingClientRect().top === 0)()`));
-  }
-  if (email === 'admin@emg.example') {
-    // simulador de economia: sem o gasto (bloco de destaque com os campos e "Calcular") e depois de preenchido (cartões completos)
-    const olhar = async nome => {
-      const ruins = {};
-      for (const idioma of ['pt-BR', 'en', 'es']) {
-        await p.avaliar(`trocarIdioma('${idioma}', false).then(() => 0)`);
-        for (const t of TAMANHOS_SIM) {
-          await tamanho(p, t); await ir(p, 'simulador');
-          const r = await p.avaliar(SIM_PROBLEMAS);
-          if (r.length) ruins[`${idioma} ${t[0]}px`] = r;
-        }
-      }
-      await p.avaliar(`trocarIdioma('pt-BR', false).then(() => 0)`); await tamanho(p, [1280, 800]); await ir(p, 'simulador');
-      conferir(`simulador ${nome}: 4 larguras x 3 idiomas, número numa linha e cabendo, cartões de altura parecida, grade sem buraco, nada partido`,
-        !Object.keys(ruins).length, J(Object.entries(ruins).slice(0, 4)));
-    };
-    await tamanho(p, [1280, 800]); await ir(p, 'simulador');
-    conferir('simulador sem gasto: um bloco "Informe o gasto…" com os campos e o botão Calcular; nenhum cartão de economia', await p.avaliar(`!!$('simDestaque')
-      && $('simDestaque').contains($('formSimulador')) && !$('formSimulador').hidden && $('simSalvar').textContent === 'Calcular'
-      && document.querySelectorAll('#simulador .sim-cartao').length === 3 && !/—/.test($('simulador').textContent)`),
-      await p.avaliar(`$('simulador').innerText.slice(0, 300)`));
-    await olhar('sem gasto');
-    await p.avaliar(`($('simGastoMin').value = '160000', $('simGastoMax').value = '300000', $('simPct').value = '100',
-      $('simNota').value = 'valores de teste', $('formSimulador').requestSubmit(), 0)`);
-    await ate(p, `estado.simulador?.documento.numeros.estimativa && !document.querySelector('#formSimulador [aria-busy="true"]')`);
-    await espera(300);
-    conferir('simulador preenchido: Estimativa (4 cartões) e Realizado (2), o formulário depois dos cartões com "Salvar"', await p.avaliar(`(() => {
-      const g = [...document.querySelectorAll('#simulador .sim-grupo')];
-      return g.length === 2 && g[0].querySelectorAll('.sim-cartao').length === 4 && g[1].querySelectorAll('.sim-cartao').length === 2
-        && !$('simDestaque') && $('simSalvar').textContent === 'Salvar' && g[1].nextElementSibling === $('formSimulador'); })()`),
-      await p.avaliar(`$('simulador').innerText.slice(0, 400)`));
-    // os valores dependem da redução real (o aviso gerado acima): a faixa anual passa de 1 milhão ("mi") e a mensal fica em "mil"
-    conferir('moeda curta no cartão ("R$ 0,82–1,54 mi", "R$ 69–129 mil") com o valor completo no title e para o leitor de tela', await p.avaliar(`(() => {
-      const ns = [...document.querySelectorAll('#simulador .sim-numero')].filter(x => / a R\\$\\s/.test(x.title));   // o title vem do toLocaleString (espaço não separável depois do R$)
-      return ns.length === 3 && ns.every(n => /^R\\$\\s[\\d,]+–[\\d,]+ (mi|mil)$/.test(n.firstElementChild.textContent)
-        && n.firstElementChild.getAttribute('aria-hidden') === 'true' && n.querySelector('.visualmente-oculto').textContent === n.title)
-        && ns.some(n => n.firstElementChild.textContent.endsWith(' mi')); })()`),
-      await p.avaliar(`[...document.querySelectorAll('#simulador .sim-numero')].map(x => x.firstElementChild.textContent + ' | ' + x.title).join(' ; ')`));
-    conferir('a legenda da redução diz de onde ela vem, em texto curto', await p.avaliar(`/^(média real de \\d+ avisos? da empresa|medição de validação \\(Leopoldina\\))$/.test(
-      document.querySelector('#simulador .sim-cartao.destaque .sim-legenda').textContent)`), await p.avaliar(`document.querySelector('#simulador .sim-cartao.destaque')?.innerText`));
-    await olhar('preenchido');
   }
   conferir(`${email.split('@')[0]}: nenhuma exceção`, !p.excecoes.length, J(p.excecoes.slice(0, 3)));
   await p.fechar();

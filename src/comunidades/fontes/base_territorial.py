@@ -1,9 +1,10 @@
 """Base territorial do município para localizar as UCs da planilha (dados reais e públicos).
 
 Endereços do CNEFE com a comunidade já limpa (fontes/ibge.py: rótulos genéricos, nomes de
-propriedade e grupos pequenos reatribuídos aos vizinhos) e o contorno do município. O mesmo nome
-em distritos diferentes vira comunidades distintas ("Vista Alegre (Piacatuba)"); o aviso tira o
-sufixo na hora de falar, como faz com os homônimos do algoritmo.
+propriedade e grupos pequenos reatribuídos aos vizinhos) e o contorno do município. O mesmo nome no
+mesmo município é UMA comunidade, mesmo que o IBGE a corte em dois distritos (desde 18/10/2026; antes
+virava "Cagado (Aracati de Minas)" e "Cagado (Cataguases)", e o aviso citava a comunidade duas vezes);
+o distrito de cada endereço continua guardado.
 
 A validação nunca usa os mesmos endereços que montaram a base (ver validacao/planilha.py).
 """
@@ -20,14 +21,11 @@ CRS_BASE = "EPSG:5880"   # Brasil Policônico (SIRGAS 2000), em metros: a mesma 
 
 
 def enderecos() -> gpd.GeoDataFrame:
-    """Endereços do município em CRS_BASE: COMUNIDADE (com acentos e distrito nos homônimos), NM_DIST, ZONA, REATRIBUIDO."""
+    """Endereços do município em CRS_BASE: COMUNIDADE (com acentos; o mesmo nome é uma só comunidade), NM_DIST, ZONA, REATRIBUIDO."""
     g = gpd.read_file(C.INTERIM / "enderecos_gabarito.gpkg",
                       columns=["NM_DIST", "ZONA", "COMUNIDADE", "REATRIBUIDO"]).to_crs(CRS_BASE)
     acentos = grafia.carregar()
     g["COMUNIDADE"] = g["COMUNIDADE"].map(lambda n: exibir(n, acentos))
-    distritos = g.groupby("COMUNIDADE")["NM_DIST"].nunique()
-    homonimo = g["COMUNIDADE"].map(distritos) > 1
-    g.loc[homonimo, "COMUNIDADE"] = g.loc[homonimo, "COMUNIDADE"] + " (" + g.loc[homonimo, "NM_DIST"] + ")"
     return g
 
 
