@@ -1,4 +1,4 @@
-"""Teste do custo do aviso no ar (a rádio cobra por spot de 30 s): regra, configuração, painel e API.
+"""Teste do custo do aviso no ar (a rádio cobra por spot de 45 s nas demos): regra, configuração, painel e API.
 
 Roda num esquema próprio (FAROL_ESQUEMA=teste_custo), apagado no fim. Confere:
 - a regra (nucleo/custo.py): 20 s = 1 spot, 30 s = 1, 31 s = 2, 100 s = 4, 0 s = 0; o valor é spots x preço x veiculações;
@@ -49,7 +49,7 @@ conferir("custo: centavos arredondados (1 spot a R$ 33,333 x 3 = R$ 100,00)", cu
 # ---------- 2. Configuração ----------
 for nome in ("demo-leopoldina", "demo-muriae"):
     r = distribuidora.carregar(Path("distribuidoras") / f"{nome}.toml").radio
-    conferir(f"{nome}.toml: spot de 30 s, preço de referência, 1 veiculação e a fonte", r.spot_segundos == 30 and r.preco_spot > 0
+    conferir(f"{nome}.toml: spot de 45 s, preço médio, 1 veiculação e a fonte", r.spot_segundos == 45 and r.preco_spot == 27.38 and r.preco_spot > 0
              and r.veiculacoes == 1 and "confirmar com a emissora" in r.fonte, str(r))
 modelo = (Path("distribuidoras") / "demo-leopoldina.toml").read_text(encoding="utf-8")
 sem_radio = modelo[:modelo.index("[radio]")] + modelo[modelo.index("[obra]"):]
@@ -64,11 +64,11 @@ def com_toml(texto):
         os.unlink(f.name)
 
 
-conferir("sem a seção [radio]: preço 0 e 30 s (a tela mostra só os spots)", com_toml(sem_radio) == TabelaRadio())
+conferir("sem a seção [radio]: preço 0 e o padrão de 30 s (a tela mostra só os spots)", com_toml(sem_radio) == TabelaRadio())
 bloco = modelo[modelo.index("[radio]"):modelo.index("[obra]")]
-for nome, alterado in (("spot de 1 s", bloco.replace("spot_segundos = 30", "spot_segundos = 1")),
-                       ("preço negativo", bloco.replace("spot_reais = 80.0", "spot_reais = -5.0")),
-                       ("preço em texto", bloco.replace("spot_reais = 80.0", 'spot_reais = "oitenta"')),
+for nome, alterado in (("spot de 1 s", bloco.replace("spot_segundos = 45", "spot_segundos = 1")),
+                       ("preço negativo", bloco.replace("spot_reais = 27.38", "spot_reais = -5.0")),
+                       ("preço em texto", bloco.replace("spot_reais = 27.38", 'spot_reais = "oitenta"')),
                        ("zero veiculações", bloco.replace("veiculacoes = 1", "veiculacoes = 0")),
                        ("fonte enorme", bloco.replace('fonte = "', 'fonte = "' + "x" * 400))):
     try:
@@ -107,17 +107,17 @@ op = TestClient(app, base_url="http://farol.teste")
 op.post("/api/entrar", json={"email": "operador@emg.example", "senha": senhas["operador@emg.example"]})
 op.post("/api/senha", json={"atual": senhas["operador@emg.example"], "nova": NOVA})
 cfg = op.get("/api/config").json()
-conferir("/api/config: a tela recebe a tabela de rádio da distribuidora", cfg["radio"] == DIST.radio.para_tela() and cfg["radio"]["spot_segundos"] == 30, str(cfg.get("radio")))
+conferir("/api/config: a tela recebe a tabela de rádio da distribuidora", cfg["radio"] == DIST.radio.para_tela() and cfg["radio"]["spot_segundos"] == 45, str(cfg.get("radio")))
 
 dono = banco_acesso.usuario_por_email("operador@emg.example")
 municipio = {**mun("3138401", 20, 100), "nome": "Leopoldina"}
 id_ = banco_acesso.gravar_aviso(dono["empresa_id"], dono["id"], f"{date.today() + timedelta(days=5):%d/%m}", "8h às 14h", "pt-BR",
                                 {"linhas": 1, "validas": 1, "problemas": 0, "fora_da_concessao": 0, "prazo": {}}, [municipio], "manutencao_preventiva", "Manutenção preventiva", lambda i: f"aviso {i}")["id"]
 p = op.get("/api/painel").json()["comparativo"]
-conferir("/api/painel: o comparativo traz os spots (4 contra 1)", (p["spots_hoje"], p["spots_farol"]) == (4, 1), str(p))
+conferir("/api/painel: o comparativo traz os spots (3 contra 1)", (p["spots_hoje"], p["spots_farol"]) == (3, 1), str(p))
 j = op.post("/api/painel/perguntar", json={"pergunta": "Quanto tempo o aviso por comunidade economiza no rádio?"}).json()
-conferir("Pergunte ao painel: o comparativo inclui a linha de spots e a resposta os cita", ["Spots de rádio (30 s)", 4, 1] in j["tabela"]["linhas"]
-         and "4 spots contra 1" in j["resposta"], str(j)[:300])
+conferir("Pergunte ao painel: o comparativo inclui a linha de spots e a resposta os cita", ["Spots de rádio (45 s)", 3, 1] in j["tabela"]["linhas"]
+         and "3 spots contra 1" in j["resposta"], str(j)[:300])
 guardado = str(banco_acesso.aviso(id_, dono["empresa_id"]))
 conferir("histórico: nenhum valor em reais é gravado", "preco" not in guardado and "R$" not in guardado and "reais" not in guardado)
 
