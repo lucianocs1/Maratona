@@ -79,27 +79,6 @@ async function abrirAviso(p) {
   await ate(p, `estado.radios.length > 0 && !!document.querySelector('.envio-radio select')`, 20000);
   conferir('envio para a rádio: aparece, sem "null" embaixo dos botões', await p.avaliar(`!!document.querySelector('.envio-radio [data-envio-acao="whatsapp"]')
     && !/\\bnull\\b/.test(document.querySelector('.envio-radio').textContent)`), (await p.avaliar(`window.__radio`)) + ' | ' + await p.avaliar(`document.querySelector('.envio-radio')?.textContent.slice(-120)`));
-  for (const [w, h] of [[1280, 800], [360, 640]]) {
-    await p.send('Emulation.setDeviceMetricsOverride', { width: w, height: h, deviceScaleFactor: 1, mobile: w < 1024 });
-    await espera(300);
-    for (const idioma of ['pt-BR', 'en', 'es']) {
-      await p.avaliar(`trocarIdioma('${idioma}', false).then(() => 0)`);
-      await espera(300);
-      const corte = await p.avaliar(`(() => { const s = document.querySelector('[data-envio="cobranca"]'); if (!s) return 'sem select';
-        const c = document.createElement('canvas').getContext('2d'); const cs = getComputedStyle(s); c.font = cs.fontSize + ' ' + cs.fontFamily;
-        const maior = Math.max(...[...s.options].map(o => c.measureText(o.textContent).width));
-        const util = s.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight) - 20;
-        return maior <= util ? '' : Math.round(maior) + ' > ' + Math.round(util); })()`);
-      conferir(`select "Cobrança" mostra o texto inteiro (${w}px, ${idioma})`, !corte, corte);
-    }
-    await p.avaliar(`trocarIdioma('pt-BR', false).then(() => 0)`);
-  }
-  const previa = await p.avaliar(`(() => { const a = document.querySelector('[data-envio="antigo"]'); a.value = ''; a.dispatchEvent(new Event('input', { bubbles: true }));
-    return document.querySelector('[id^="previa-"]').textContent; })()`);
-  conferir('economia sem o custo antigo: diz o que preencher', /preencha "Quanto custaria do jeito antigo" para calcular/.test(previa) && /no ar/.test(previa), previa);
-  const comAntigo = await p.avaliar(`(() => { const a = document.querySelector('[data-envio="antigo"]'); a.value = '900,00'; a.dispatchEvent(new Event('input', { bubbles: true }));
-    return document.querySelector('[id^="previa-"]').textContent; })()`);
-  conferir('economia com o custo antigo: "Economia: R$ X em relação ao jeito antigo"', /Economia: R\$\s?[\d.,]+ em relação ao jeito antigo/.test(comAntigo), comAntigo);
   await p.fechar();
 }
 

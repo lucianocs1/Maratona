@@ -290,17 +290,17 @@ const ucs = readFileSync(PLANILHA, 'utf-8').split(/\r?\n/).slice(1).filter(Boole
   conferir('comparativo: o aviso de hoje igual ao da API, ao lado do aviso por comunidade, com a economia de tempo',
     comp.textos[0]?.[0] === m0.hoje?.texto && comp.textos[0]?.[1] === m0.mensagem && /^\d+% menos tempo no ar$/.test(comp.economia || '')
     && comp.numeros?.startsWith(`${m0.hoje.locais} locais`), JSON.stringify({ economia: comp.economia, numeros: comp.numeros, hoje: comp.textos[0]?.[0]?.slice(0, 80) }));
-  // custo no ar: a rádio cobra por spot de 30 s; o preço de referência vem da configuração e o operador pode mudar
+  // custo no ar: a rádio cobra por spot de 45 s; o preço de referência vem da configuração e o operador pode mudar
   const brl = v => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }).replace(/\s/g, ' ');
-  const spH = Math.ceil(m0.hoje.segundos / 30), spF = Math.ceil(m0.segundos / 30);
+  const spH = Math.ceil(m0.hoje.segundos / 45), spF = Math.ceil(m0.segundos / 45);
   await ate(p, `document.querySelector('#comparativoTotal .comp-custo')`);
   const custo1 = await p.avaliar(`({ campo: !$('custoRadio').hidden, preco: $('precoSpot').value, ajuda: $('custoRadioAjuda').textContent,
     cartao: document.querySelector('#comparativo .comp .comp-custo')?.textContent.replace(/\\s/g, ' '),
     total: document.querySelector('#comparativoTotal .comp-custo')?.textContent.replace(/\\s/g, ' ') })`);
-  const esperadoCartao = `Rádio (spots de 30 s): hoje ${spH} spot${spH === 1 ? '' : 's'} · ${brl(spH * 80)} · Farol ${spF} spot${spF === 1 ? '' : 's'} · ${brl(spF * 80)} · economia de ${brl((spH - spF) * 80)} por veiculação.`;
-  conferir('custo: preço de referência de R$ 80 por spot de 30 s, spots inteiros, economia e aviso "a confirmar com a emissora"',
-    custo1.campo && custo1.preco === '80' && /a confirmar com a emissora/.test(custo1.ajuda) && custo1.cartao === esperadoCartao, JSON.stringify({ custo1, esperadoCartao }));
-  conferir('custo: o total da empresa também mostra spots e reais', /^Rádio \(spots de 30 s\): hoje \d+ spots? · R\$ [\d.,]+ · Farol \d+ spots? · R\$ [\d.,]+ · economia de R\$ [\d.,]+ por veiculação\.$/.test(custo1.total || ''), custo1.total);
+  const esperadoCartao = `Rádio (spots de 45 s): hoje ${spH} spot${spH === 1 ? '' : 's'} · ${brl(spH * 27.38)} · Farol ${spF} spot${spF === 1 ? '' : 's'} · ${brl(spF * 27.38)} · economia de ${brl((spH - spF) * 27.38)} por veiculação.`;
+  conferir('custo: preço de referência de R$ 27,38 por spot de 45 s, spots inteiros, economia e aviso "a confirmar com a emissora"',
+    custo1.campo && custo1.preco === '27,38' && /a confirmar com a emissora/.test(custo1.ajuda) && custo1.cartao === esperadoCartao, JSON.stringify({ custo1, esperadoCartao }));
+  conferir('custo: o total da empresa também mostra spots e reais', /^Rádio \(spots de 45 s\): hoje \d+ spots? · R\$ [\d.,]+ · Farol \d+ spots? · R\$ [\d.,]+ · economia de R\$ [\d.,]+ por veiculação\.$/.test(custo1.total || ''), custo1.total);
   await p.avaliar(`($('precoSpot').value = '120,50', $('precoSpot').dispatchEvent(new Event('change', { bubbles: true })), 0)`);
   await p.avaliar(`($('veiculacoes').value = '3', $('veiculacoes').dispatchEvent(new Event('change', { bubbles: true })), 0)`);
   const custo2 = await p.avaliar(`document.querySelector('#comparativo .comp .comp-custo').textContent.replace(/\\s/g, ' ')`);
@@ -391,17 +391,13 @@ const ucs = readFileSync(PLANILHA, 'utf-8').split(/\r?\n/).slice(1).filter(Boole
     nome: 'Rádio Leopoldina FM (demonstração)', email: 'leopoldina.fm@example.com', whatsapp: '(32) 99999-0001', valor_padrao: '150,00', cobranca: 'minuto',
     alcance: { municipios: [cod] } }) });
   await p.avaliar(`carregarEnvios()`);
-  await ate(p, `document.querySelector('#envio-${cod} [data-envio=valor]')`);
+  await ate(p, `document.querySelector('#envio-${cod} select[data-envio=radioId]')`);
   conferir('envio: sem SMTP neste servidor, sem o botão de e-mail e com o aviso', await p.avaliar(`!document.querySelector('#envio-${cod} [data-envio-acao=email]')
     && /desligado neste servidor/.test($('envio-${cod}').textContent)`));
-  const previa = await p.avaliar(`$('previa-${cod}').textContent`);
-  conferir('rádio cadastrada pelo Admin: sugerida com o valor padrão; prévia com a economia calculada pelo tempo no ar',
-    await p.avaliar(`document.querySelector('#envio-${cod} [data-envio=valor]').value === '150,00' && !document.querySelector('#envio-${cod} .alerta-amarelo')`)
-    && /^custo R\$\s?[\d.,]+ · Economia: R\$\s?[\d.,]+ pelo tempo a menos no ar · .+ a menos no ar$/.test(previa), previa);
-  await p.avaliar(`(() => { const i = document.querySelector('#envio-${cod} [data-envio=cobranca]'); i.value = 'fechado'; i.dispatchEvent(new Event('change', { bubbles: true })); return 0; })()`);
-  const previaFechado = await p.avaliar(`$('previa-${cod}').textContent`);
-  conferir('valor fechado sem o custo antigo: a prévia não inventa economia', /Economia: preencha "Quanto custaria do jeito antigo" para calcular/.test(previaFechado), previaFechado);
-  await p.avaliar(`(() => { const i = document.querySelector('#envio-${cod} [data-envio=cobranca]'); i.value = 'minuto'; i.dispatchEvent(new Event('change', { bubbles: true })); return 0; })()`);
+  const infoEnvio = await p.avaliar(`$('envio-${cod}').textContent`);
+  conferir('envio: só a rádio e os botões; sem valor, cobrança nem economia; com a referência do preço médio do spot',
+    await p.avaliar(`!document.querySelector('#envio-${cod} [data-envio=valor], #envio-${cod} [data-envio=cobranca], #envio-${cod} [data-envio=antigo], #envio-${cod} .alerta-amarelo')`)
+    && /Referência: preço médio de R\$\s?27,38 por spot de 45 s/.test(infoEnvio), infoEnvio.slice(0, 200));
   await p.avaliar(`(document.querySelector('#envio-${cod} [data-envio-acao=whatsapp]').click(), 0)`);
   await ate(p, `!!document.querySelector('dialog.zap[open]')`);
   const zap = await p.avaliar(`({ nome: document.querySelector('.zap-topo strong').textContent, numero: document.querySelector('.zap-topo small').textContent,
@@ -410,8 +406,8 @@ const ucs = readFileSync(PLANILHA, 'utf-8').split(/\r?\n/).slice(1).filter(Boole
     zap.numero === '32999990001' && /^Pessoal de /.test(zap.texto) && zap.anexos >= 1 && !zap.simulado, JSON.stringify(zap).slice(0, 200));
   await p.avaliar(`(document.querySelector('#zapEnviar').click(), 0)`);
   await ate(p, `/WhatsApp enviado/.test($('estado').textContent) && document.querySelectorAll('#envio-${cod} .envios li').length === 1`);
-  conferir('WhatsApp: o envio fica na lista com valor e economia',
-    /Economia: R\$\s?[\d.,]+ pelo tempo a menos no ar/.test(await p.avaliar(`$('envio-${cod}').textContent`)) && await p.avaliar(`!document.querySelector('dialog.zap')`));
+  conferir('WhatsApp: o envio fica na lista, sem valor nem economia',
+    await p.avaliar(`document.querySelectorAll('#envio-${cod} .envios li').length === 1 && !/R\$|Economia/.test(document.querySelector('#envio-${cod} .envios').textContent) && !document.querySelector('dialog.zap')`));
   conferir('Copiar mensagem e Pedir cadastro de rádio saíram da tela de envio', await p.avaliar(`!document.querySelector('#envio-${cod} [data-envio-acao=copia]') && !document.querySelector('#envio-${cod} [data-envio-acao=pedir]')`));
   await captura(p, '2e_envio_radio.png');
   await p.avaliar(`($('novoAviso').click(), 0)`);

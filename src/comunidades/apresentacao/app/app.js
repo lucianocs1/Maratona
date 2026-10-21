@@ -721,8 +721,7 @@ function desenharEnvio(m) {
   const lista = feitos.length ? [no('h4', { texto: t('Envios para a rádio') }), no('ul', { classe: 'envios' }, feitos.map(e => no('li', {},
     no('span', { classe: `chip envio ${e.status}`, texto: t(SITUACAO_ENVIO[e.status]) + (e.confirmado_em ? t(' em {quando}', { quando: dataHora(e.confirmado_em) }) : '') }),
     no('span', { texto: `${e.radio_nome} · ${t(CANAL[e.canal])}${e.destino && e.canal !== 'copia' ? ` (${e.destino})` : ''}` }),
-    no('span', { classe: 'meta', texto: t('{valor} ({cobranca}) · {economia} · por {nome} em {quando}', { valor: dinheiro(e.valor),
-      cobranca: t(COBRANCA[e.cobranca]), economia: economiaTexto(e), nome: e.por, quando: dataHora(e.criado_em) }) }),
+    no('span', { classe: 'meta', texto: t('por {nome} em {quando}', { nome: e.por, quando: dataHora(e.criado_em) }) }),
     e.arquivos.length ? no('span', { classe: 'acoes' }, e.arquivos.map(tipo => no('button', { type: 'button', 'data-arquivo': tipo, 'data-envio-id': e.id,
       texto: tipo === 'pdf' ? t('PDF enviado') : t('MP3 enviado') }))) : null)))] : [];
   if (!(r.id && pode('gerar_aviso') && r.status !== 'cancelado')) return lugar.replaceChildren(...lista);
@@ -736,17 +735,15 @@ function desenharEnvio(m) {
     : t(' · alcança {n} comunidade(s)', { n: cobrem.get(x.id).comunidades })) : t(' · fora do alcance cadastrado');
   const sel = no('select', { 'data-envio': 'radioId', id: `radio-${cod}` },
     ordem.map(x => no('option', { value: String(x.id), texto: x.nome + alcance(x), selected: String(x.id) === String(e.radioId) })));
-  const campo = (rotulo, nome, extra = {}) => no('label', { texto: t(rotulo) }, no('input', { id: `${nome}-${cod}`, 'data-envio': nome, value: e[nome] ?? '',
-    autocomplete: 'off', ...extra }));
+  const tabela = estado.config?.radio, escolhida = estado.radios.find(x => String(x.id) === String(e.radioId));
+  const referencia = tabela?.preco_spot > 0 ? t('Referência: preço médio de {preco} por spot de {s} s.', { preco: dinheiro(tabela.preco_spot), s: tabela.spot_segundos })
+    + (escolhida?.valor_padrao != null ? ' ' + t('Esta rádio tem valor padrão cadastrado ({valor}); é ele que vale no registro do envio.', { valor: dinheiro(escolhida.valor_padrao) }) : '')
+    : '';
   const blocos = [no('h4', { texto: t('Enviar para a rádio') })];
   if (s.sem_radio.length) blocos.push(no('p', { classe: 'alerta-amarelo', role: 'status' }, no('span', { 'aria-hidden': 'true', texto: '⚠ ' }),
     t('Sem rádio cadastrada para: {lista}.', { lista: s.sem_radio.join(', ') })));
   if (ordem.length) blocos.push(no('label', { for: `radio-${cod}`, texto: t('Rádio') }), sel,
-    no('div', { classe: 'campos' }, campo('Valor deste envio (R$, obrigatório)', 'valor', { inputmode: 'decimal', placeholder: '0,00' }),
-      no('label', { texto: t('Cobrança') }, no('select', { id: `cobranca-${cod}`, 'data-envio': 'cobranca' },
-        Object.entries(COBRANCA).map(([k, rot]) => no('option', { value: k, texto: t(rot), selected: k === e.cobranca })))),
-      campo('Quanto custaria do jeito antigo (R$, opcional)', 'antigo', { inputmode: 'decimal', placeholder: t('opcional') })),
-    no('p', { classe: 'economia-linha' }, no('span', { classe: 'economia', id: `previa-${cod}`, 'aria-live': 'polite' }), dica('economia', 'economia calculada e informada')),
+    referencia ? no('p', { classe: 'ajuda', texto: referencia }) : null,
     no('div', { classe: 'acoes' },
       estado.config?.email !== false ? no('button', { type: 'button', classe: 'prim', 'data-envio-acao': 'email', texto: t('Enviar por e-mail') }) : null,
       no('button', { type: 'button', 'data-envio-acao': 'whatsapp', texto: t('Enviar por WhatsApp') })),
@@ -756,12 +753,10 @@ function desenharEnvio(m) {
     pode('gerenciar_radios') ? no('div', { classe: 'acoes' }, no('button', { type: 'button', 'data-envio-acao': 'ir-radios', texto: t('Ir para Rádios') })) : null);
   // replaceChildren escreveria null como o texto "null": os blocos vazios saem antes
   lugar.replaceChildren(...blocos.filter(Boolean), ...lista);
-  desenharPrevia(cod);
 }
 
 function escolhaPadrao(radio) {
-  return radio ? { radioId: String(radio.id), valor: radio.valor_sugerido ? Number(radio.valor_sugerido).toFixed(2).replace('.', ',') : '',
-    cobranca: radio.cobranca_sugerida || 'fechado', antigo: '' } : { radioId: '', valor: '', cobranca: 'fechado', antigo: '' };
+  return { radioId: radio ? String(radio.id) : '' };
 }
 
 // falta uma rádio: o Operador pede o cadastro ao Admin da empresa (contato da rádio, nunca de cliente)
@@ -783,16 +778,6 @@ function formPedidoRadio(m, e) {
       no('span', { classe: `chip ${x.status === 'recusado' ? 'cancelado' : ''}`, texto: t(SITUACAO_PEDIDO[x.status]) }),
       no('span', { texto: t('{nome} ({cidade}) · {quando}', { nome: x.nome, cidade: x.cidade, quando: dataHora(x.criado_em) })
         + (x.motivo_recusa ? t(' · motivo: {motivo}', { motivo: x.motivo_recusa }) : '') }))))) : null);
-}
-
-function desenharPrevia(cod) {
-  const lugar = $(`previa-${cod}`), e = estado.escolha[cod];
-  if (!lugar || !e) return;
-  const m = estado.resultado.municipios.find(x => x.codigo_ibge === cod), valor = reaisNumero(e.valor), antigo = reaisNumero(e.antigo);
-  if (valor === null || Number.isNaN(valor)) return lugar.textContent = t('Informe o valor do envio em R$.');
-  if (Number.isNaN(antigo)) return lugar.textContent = t('O custo antigo tem de ser um valor em R$.');
-  lugar.textContent = economiaTexto(previaEconomia({ cobranca: e.cobranca, valor, segundosFarol: segundos(estado.avisos[cod]),
-    segundosHoje: m.hoje?.segundos ?? null, custoAntigo: antigo }), true);
 }
 
 // copiloto de IA: pede ao servidor uma versão do aviso (mais curto, WhatsApp...); o servidor confere o resultado
@@ -831,7 +816,6 @@ function desenharTempo(codigo) {
   $(`tempo-${codigo}`).textContent = tempoTexto(estado.avisos[codigo]);
   desenharFinal(codigo);
   desenharTocador(codigo);
-  desenharPrevia(codigo);
 }
 
 // o tocador aparece com o áudio do texto atual; se o texto mudou, some (o áudio antigo não vale mais)
@@ -2625,7 +2609,6 @@ function editarEnvio(evento) {
     Object.assign(e, escolhaPadrao(radio));
     return desenharEnvio(estado.resultado.municipios.find(x => x.codigo_ibge === cod));
   }
-  desenharPrevia(cod);
 }
 
 async function acaoEnvio(evento) {
@@ -2727,10 +2710,7 @@ function janelaEmail(m, radio, texto) {
 async function enviarParaRadio(m, canal, sec) {
   const cod = m.codigo_ibge, e = estado.escolha[cod], radio = estado.radios.find(x => String(x.id) === String(e.radioId));
   if (!radio) return avisar(t('Escolha a rádio.'), true);
-  const valor = reaisNumero(e.valor), antigo = reaisNumero(e.antigo), texto = estado.avisos[cod];
-  const erros = [(valor === null || Number.isNaN(valor)) && [`valor-${cod}`, t('Informe o valor deste envio em R$ (ex.: 150,00).')],
-    Number.isNaN(antigo) && [`antigo-${cod}`, t('O custo antigo tem de ser um valor em R$ (ou vazio).')]].filter(Boolean);
-  if (erros.length) { mostrarErros(sec, erros); return avisar(erros[0][1], true); }
+  const texto = estado.avisos[cod];
   limparErros(sec);
   if (canal === 'email') {
     if (!radio.email) return avisar(t('{nome} não tem e-mail cadastrado.', { nome: radio.nome }), true);
@@ -2743,8 +2723,7 @@ async function enviarParaRadio(m, canal, sec) {
     if (!confirm(t('Copiar a mensagem para mandar para {nome}?', { nome: radio.nome }))) return;
     try { await navigator.clipboard.writeText(texto); } catch (x) { return avisar(t('Não foi possível copiar; selecione o texto e use Ctrl+C.'), true); }
   }
-  const j = await api(`/api/historico/${estado.resultado.id}/envios`, { method: 'POST', json: { municipio: cod, radio_id: radio.id, canal, texto,
-    valor: e.valor, cobranca: e.cobranca, custo_antigo: e.antigo || null } });
+  const j = await api(`/api/historico/${estado.resultado.id}/envios`, { method: 'POST', json: { municipio: cod, radio_id: radio.id, canal, texto } });
   avisar(j.erro || t({ email: 'E-mail enviado com sucesso para {nome} ({email}). A rádio confirma pelo link do e-mail.',
     whatsapp: 'WhatsApp enviado para {nome}; o envio ficou registrado.', copia: 'Mensagem copiada para {nome}; o envio ficou registrado.' }[canal],
     { nome: radio.nome, email: radio.email }), !!j.erro);

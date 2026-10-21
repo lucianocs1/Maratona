@@ -410,13 +410,9 @@ await secao('Operador', async ctx => {
   const cod = await p.avaliar(`estado.resultado.municipios.find(m => m.nome === 'Leopoldina').codigo_ibge`);
   await ate(p, `document.querySelector('#envio-${cod} select[data-envio=radioId]')`);
   const envio0 = await p.avaliar(`({ opcoes: [...document.querySelector('#envio-${cod} select[data-envio=radioId]').options].map(o => o.value + ':' + o.textContent),
-    valor: document.querySelector('#envio-${cod} [data-envio=valor]')?.value, cobranca: document.querySelector('#envio-${cod} [data-envio=cobranca]')?.value })`);
-  conferir('Envio (Operador): sem "+ Nova rádio"; a rádio do Admin na lista, com o valor padrão sugerido', !envio0.opcoes.some(o => o.startsWith('nova'))
-    && /Rádio Verificação FM/.test(envio0.opcoes[0]) && envio0.valor === '99,90' && envio0.cobranca === 'minuto', J(envio0));
-  await p.avaliar(`(() => { const s = (n, v) => { const i = document.querySelector('#envio-${cod} [data-envio=' + n + ']'); i.value = v; i.dispatchEvent(new Event(i.tagName === 'SELECT' ? 'change' : 'input', { bubbles: true })); };
-    s('valor', '130,00'); s('cobranca', 'fechado'); s('antigo', '400'); return 0; })()`);
-  const previaE = await p.avaliar(`$('previa-${cod}').textContent`);
-  conferir('Envio: valor, cobrança e custo antigo mudam a prévia (economia informada)', /custo R\$\s?130,00 · Economia: R\$\s?270,00 em relação ao jeito antigo/.test(previaE), previaE);
+    campos: !!document.querySelector('#envio-${cod} [data-envio=valor], #envio-${cod} [data-envio=cobranca], #envio-${cod} [data-envio=antigo]') })`);
+  conferir('Envio (Operador): sem "+ Nova rádio"; a rádio do Admin na lista, sem campos de valor, cobrança nem custo antigo', !envio0.opcoes.some(o => o.startsWith('nova'))
+    && /Rádio Verificação FM/.test(envio0.opcoes[0]) && !envio0.campos, J(envio0));
   // e-mail (Mailpit): PDF e MP3 anexos, entregue; clique duplo não manda dois
   const salvandoE = await p.avaliar(`(() => { const b = document.querySelector('#envio-${cod} [data-envio-acao=email]'); b.click(); return [true, 'Enviando']; })()`);
   await ate(p, `!!document.querySelector('dialog.mail[open]')`);
@@ -424,8 +420,8 @@ await secao('Operador', async ctx => {
   await ate(p, `document.querySelectorAll('#envio-${cod} .envios li').length >= 1 && /entregue/.test($('envio-${cod}').textContent)`, 120000);
   await espera(800);
   const enviosE = (await api(p, `/api/historico/${avisoId}/envios`)).j.envios;
-  conferir('Envio por e-mail: clique duplo manda um e-mail só ("Enviando…"), entregue, valor e cobrança gravados', salvandoE[0] && /Enviando/.test(salvandoE[1])
-    && enviosE.length === 1 && enviosE[0].status === 'entregue' && enviosE[0].valor === '130.00' && enviosE[0].cobranca === 'fechado' && enviosE[0].custo_antigo === '400.00', J([salvandoE, enviosE.length, enviosE[0]?.status]));
+  conferir('Envio por e-mail: clique duplo manda um e-mail só ("Enviando…"), entregue, valor padrão da rádio gravado', salvandoE[0] && /Enviando/.test(salvandoE[1])
+    && enviosE.length === 1 && enviosE[0].status === 'entregue' && enviosE[0].valor === '99.90' && enviosE[0].cobranca === 'minuto' && enviosE[0].custo_antigo === null, J([salvandoE, enviosE.length, enviosE[0]?.status]));
   permitir(p, /\/api\/historico\/\d+\/envios$/, 409);
   const dupEnvio = await api(p, `/api/historico/${avisoId}/envios`, 'POST', { municipio: cod, radio_id: enviosE[0].radio_id, canal: 'copia', texto: enviosE[0].texto || await p.avaliar(`estado.avisos['${cod}']`),
     valor: '130,00', cobranca: 'fechado' });

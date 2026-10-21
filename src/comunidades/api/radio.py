@@ -35,13 +35,14 @@ from ..banco import base_territorial as banco_territorio
 from ..banco import radios as banco
 from ..config import sem_acento
 from ..nucleo import economia, mensagem
+from ..nucleo.custo import custo as custo_spots
 from ..nucleo import radios as alcance_
 from ..nucleo.acesso import PERFIS, problema_email
 from ..nucleo.auditoria import diferencas
 from ..nucleo.tipos_desligamento import _EMAIL, _NUMEROS, _SITE, limpar
 from ..segredos import segredo
 from .acesso import exigir
-from .comum import AUDIO, AVISO_FICTICIO, BRASILIA, config_empresa, erro, segundos
+from .comum import AUDIO, AVISO_FICTICIO, BRASILIA, DIST, config_empresa, erro, segundos
 
 rotas = APIRouter()
 LIMITE_EMAILS, JANELA_EMAILS = 30, 3600          # e-mails para rádios por usuário por hora
@@ -391,9 +392,20 @@ class PedidoEnvio(BaseModel):
     radio_id: int
     canal: Literal["email", "whatsapp", "copia"]
     texto: str = Field(max_length=mensagem.MAX_MENSAGEM + 500)
-    valor: str | float = Field(...)
-    cobranca: Literal["fechado", "minuto"]
+    valor: str | float | None = None      # sem valor, vale o padrão da rádio ou o preço médio do spot (_valor_do_envio)
+    cobranca: Literal["fechado", "minuto"] | None = None
     custo_antigo: str | float | None = None
+
+
+def _valor_do_envio(r: dict, seg: int) -> tuple[Decimal, str]:
+    """Valor e cobrança de um envio feito sem valor informado: o valor padrão da rádio (com a cobrança dela) e, se ela não tem,
+    o preço médio do spot da distribuidora x os spots do aviso x as veiculações. Estimativa, nunca o valor real cobrado."""
+    if r["valor_padrao"] is not None:
+        return r["valor_padrao"], r["cobranca"]
+    tabela = DIST.radio
+    if tabela.preco_spot <= 0:
+        raise erro(422, "A rádio não tem valor padrão e não há preço médio de spot configurado.", "valor")
+    return economia.reais(custo_spots(seg, tabela.preco_spot, tabela.veiculacoes, tabela.spot_segundos)), "fechado"
 
 
 def _envio_publico(e: dict) -> dict:
@@ -440,10 +452,13 @@ def enviar(id_: int, dados: PedidoEnvio, u: dict = Depends(exigir("gerar_aviso")
         custo_antigo = economia.reais(dados.custo_antigo)
     except ValueError as e:
         raise erro(422, f"Custo antigo: {e}.", "custo_antigo") from None
+    seg, seg_hoje = segundos(texto), (m.get("hoje") or {}).get("segundos")
+    cobranca = dados.cobranca
     if valor is None:
-        raise erro(422, "Informe o valor do envio (R$).", "valor")
+        valor, cobranca = _valor_do_envio(r, seg)
+    cobranca = cobranca or "fechado"
     if (ja := banco.envio_repetido({"aviso_id": a["id"], "municipio": m["codigo_ibge"], "radio_id": r["id"], "canal": dados.canal,
-                                    "texto": texto, "valor": valor, "cobranca": dados.cobranca})):
+                                    "texto": texto, "valor": valor, "cobranca": cobranca})):
         raise erro(409, f"Este envio acabou de ser registrado (envio nº {ja}). Para repetir, espere um minuto.")
     if dados.canal == "email":
         if not correio.ligado():
@@ -451,16 +466,15 @@ def enviar(id_: int, dados: PedidoEnvio, u: dict = Depends(exigir("gerar_aviso")
         if not cofre.disponivel():
             raise HTTPException(503, "Sem a chave do cofre (FAROL_CHAVE_ARQUIVOS): o PDF e o MP3 enviados não seriam guardados.")
         _limite_emails(u["id"])
-    seg, seg_hoje = segundos(texto), (m.get("hoje") or {}).get("segundos")
-    eco = economia.calcular(dados.cobranca, valor, seg, seg_hoje, custo_antigo)
+    eco = economia.calcular(cobranca, valor, seg, seg_hoje, custo_antigo)
     envio_id = banco.criar_envio({
         "empresa_id": u["empresa_id"], "aviso_id": a["id"], "municipio": m["codigo_ibge"], "municipio_nome": m["nome"],
         "radio_id": r["id"], "radio_nome": r["nome"], "canal": dados.canal, "destino": destino or "", "texto": texto,
-        "valor": valor, "cobranca": dados.cobranca, "custo": eco["custo"], "custo_antigo": custo_antigo, "economia": eco["economia"],
+        "valor": valor, "cobranca": cobranca, "custo": eco["custo"], "custo_antigo": custo_antigo, "economia": eco["economia"],
         "economia_tipo": eco["economia_tipo"], "segundos": seg, "segundos_hoje": seg_hoje, "tempo_economizado": eco["tempo_economizado"],
         "status": "preparando" if dados.canal == "email" else "enviado", "criado_por": u["id"], "criado_por_nome": u["nome"]})
     banco_acesso.registrar("informou o valor do envio", f"envio {envio_id} ({r['nome']}): R$ {valor:.2f}, "
-                           f"{economia.COBRANCAS[dados.cobranca]}" + (f", custo antigo informado R$ {custo_antigo:.2f}" if custo_antigo is not None else "")
+                           f"{economia.COBRANCAS[cobranca]}" + (f", custo antigo informado R$ {custo_antigo:.2f}" if custo_antigo is not None else "")
                            + (f", economia {eco['economia_tipo']} R$ {eco['economia']:.2f}" if eco["economia"] is not None else ""),
                            u["id"], u["empresa_id"])
     if m.get("texto_final") != texto:

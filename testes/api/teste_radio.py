@@ -366,8 +366,7 @@ try:
     for nome, txt in [("número de UC", texto + " UC 3000029045."), ("e-mail", texto + " fulano@example.com"),
                       ("site", texto + " www.exemplo.com"), ("vazio", "   ")]:
         conferir(f"texto recusado: {nome} (422)", op.post(f"/api/historico/{a['id']}/envios", json={**base_envio, "texto": txt}).status_code == 422)
-    conferir("valor inválido ou ausente: 422", op.post(f"/api/historico/{a['id']}/envios", json={**base_envio, "texto": texto, "valor": "-1"}).status_code == 422
-             and op.post(f"/api/historico/{a['id']}/envios", json={**base_envio, "texto": texto, "valor": ""}).status_code == 422)
+    conferir("valor inválido: 422", op.post(f"/api/historico/{a['id']}/envios", json={**base_envio, "texto": texto, "valor": "-1"}).status_code == 422)
     conferir("Consulta não envia (403) mas vê os envios", con.post(f"/api/historico/{a['id']}/envios", json={**base_envio, "texto": texto}).status_code == 403
              and len(con.get(f"/api/historico/{a['id']}/envios").json()["envios"]) == 4)
     # adulteração no cofre
@@ -415,6 +414,12 @@ try:
              outra.get(f"/api/historico/{a['id']}/envios").status_code == 404 and outra.get(f"/api/envios/{env['id']}/arquivos/mp3").status_code == 404
              and outra.get("/api/radios").json()["radios"] == [] and outra.get(f"/api/historico/{a['id']}/radios").status_code == 404
              and outra.patch(f"/api/radios/{leo_id}", json={"nome": "Invasão", "email": "x@example.com"}).status_code == 404)
+    # sem valor informado: vale o padrão da rádio (999,00 por minuto) e, sem padrão, o preço médio do spot x os spots do aviso
+    sem_valor = {"municipio": "3138401", "radio_id": leo_id, "canal": "copia", "texto": texto + " "}
+    r_sem = op.post(f"/api/historico/{a['id']}/envios", json=sem_valor)
+    conferir("envio sem valor: usa o valor padrão da rádio", r_sem.status_code == 200, r_sem.text[:200])
+    envs_sem = op.get(f"/api/historico/{a['id']}/envios").json()["envios"]
+    conferir("envio sem valor: gravado com o padrão e a cobrança da rádio", any(e["valor"] == "999.00" and e["cobranca"] == "minuto" for e in envs_sem))
     conferir("auditoria íntegra depois de tudo", adm.get("/api/auditoria/verificar").json()["ok"] is True)
 finally:
     caixa.terminate()
