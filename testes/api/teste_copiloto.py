@@ -83,7 +83,7 @@ for pedido in copiloto.PEDIDOS:
     r = v(texto, max_caracteres=limite or 3000)
     conferir(f"simulado: pedido {pedido} sai aprovado pelo verificador", r.ok and texto != AVISO, f"{texto!r} {r.motivos}")
 conferir("simulado: o curto é mesmo mais curto", len(copiloto.reescrever(AVISO, "curto")) < len(AVISO))
-conferir("simulado: pedido livre entende palavras-chave", copiloto.reescrever(AVISO, "livre", "faça uma mensagem para o whatsapp").startswith("Desligamento"))
+conferir("simulado: pedido livre entende palavras-chave", copiloto.reescrever(AVISO, "livre", "faça uma mensagem de réveillon").startswith("Feliz Ano Novo"))
 try:
     copiloto.reescrever(AVISO, "livre", "traduza para o japonês")
     conferir("simulado: pedido livre que não entende é recusado com mensagem", False)
@@ -128,13 +128,13 @@ municipio = {"codigo_ibge": "3138401", "nome": MUN, "uf": "MG", "ucs": 120, "seg
 id_ = banco_acesso.gravar_aviso(dono["empresa_id"], dono["id"], "20/11", "8h às 14h", "pt-BR",
                                 {"linhas": 120, "validas": 120, "problemas": 0, "fora_da_concessao": 0, "prazo": {}}, [municipio], "manutencao_preventiva", "Manutenção preventiva", lambda i: f"aviso {i}")["id"]
 rota = f"/api/historico/{id_}/municipios/3138401/reescrever"
-pedido = {"texto": AVISO, "pedido": "whatsapp"}
+pedido = {"texto": AVISO, "pedido": "anonovo"}
 
 conferir("config: a IA aparece como simulada", op.get("/api/config").json()["ia"]["provedor"] == "simulado"
          and set(op.get("/api/config").json()["ia"]["pedidos"]) == set(copiloto.PEDIDOS))
 conferir("sem login: 401", cliente().post(rota, json=pedido).status_code == 401)
 r = op.post(rota, json=pedido).json()
-conferir("Operador: texto reescrito e verificado", r["verificado"] and r["texto"].startswith("Desligamento") and "*" not in r["texto"] and r["provedor"] == "simulado" and not r["motivos"], str(r))
+conferir("Operador: texto reescrito e verificado", r["verificado"] and r["texto"].startswith("Feliz Ano Novo") and "*" not in r["texto"] and r["provedor"] == "simulado" and not r["motivos"], str(r))
 conferir("Admin da empresa: pode", cliente("admin@emg.example").post(rota, json=pedido).status_code == 200)
 conferir("Consulta: não pode (403)", cliente("consulta@emg.example").post(rota, json=pedido).status_code == 403)
 conferir("Admin do Farol: não pode (403)", cliente("admin@farol.example").post(rota, json=pedido).status_code == 403)

@@ -1,4 +1,4 @@
-"""Copiloto do aviso: reescreve o texto do aviso a pedido do operador (mais curto, WhatsApp, SMS, tom acolhedor).
+"""Copiloto do aviso: reescreve o texto do aviso a pedido do operador (mais curto, tom acolhedor, Ano Novo).
 
 Isolado neste módulo, como o áudio: trocar de provedor não mexe no resto. Quem confere o resultado é
 nucleo/verificador.py, na rota da API; aqui só se produz o texto candidato.
@@ -32,13 +32,11 @@ PROVEDOR = (C.segredo("FAROL_IA") or "simulado").strip().lower()
 MODELO = C.segredo("FAROL_IA_MODELO") or "claude-haiku-5-5"
 URL_ANTHROPIC = "https://api.anthropic.com/v1/messages"
 MAX_LIVRE = 200          # o pedido escrito pelo operador
-MAX_SMS = 320            # duas mensagens de SMS concatenadas
 PEDIDOS = {              # id -> (rótulo na tela, instrução ao provedor, limite de caracteres)
     "curto": ("Mais curto", "Reescreva mais curto, para caber em poucos segundos no ar do rádio.", None),
-    "whatsapp": ("WhatsApp", "Reescreva como mensagem de WhatsApp: linhas curtas, com o título em negrito "
-                 "(entre asteriscos), sem emojis.", None),
-    "sms": ("SMS", f"Reescreva como SMS, em texto simples, sem acentos obrigatórios, com no máximo {MAX_SMS} caracteres.", MAX_SMS),
     "acolhedor": ("Tom acolhedor", "Reescreva em tom acolhedor e cordial, pedindo desculpas pelo transtorno.", None),
+    "anonovo": ("Data comemorativa: Ano Novo", "Reescreva no modelo de data comemorativa de Ano Novo: comece com uma saudação "
+                "de feliz Ano Novo e mantenha o aviso do desligamento logo em seguida, em tom caloroso.", None),
 }
 
 
@@ -81,11 +79,11 @@ _FRASE = re.compile(
 def _pedido_livre(livre: str) -> str:
     """O simulado entende só algumas palavras-chave do pedido livre."""
     p = livre.lower()
-    pedido = ("whatsapp" if "whats" in p else "sms" if "sms" in p else
+    pedido = ("anonovo" if re.search(r"ano novo|r[eé]veillon|comemorativ", p) else
               "acolhedor" if re.search(r"acolhed|cordial|gentil|simp[aá]tic|desculp", p) else
               "curto" if re.search(r"curt|resum|breve|r[aá]pid", p) else "")
     if not pedido:
-        raise CopilotoIndisponivel("O copiloto simulado entende: curto, WhatsApp, SMS e acolhedor. "
+        raise CopilotoIndisponivel("O copiloto simulado entende: curto, acolhedor e Ano Novo. "
                                    "Com a IA de verdade (FAROL_IA=anthropic), qualquer pedido funciona.")
     return pedido
 
@@ -102,10 +100,8 @@ def _simulado_generico(texto: str, pedido: str) -> str:
             raise CopilotoIndisponivel("O copiloto simulado não achou o que cortar neste texto. Use \"Desfazer edição\" "
                                        "e tente de novo, ou, com a IA de verdade (FAROL_IA=anthropic), qualquer texto funciona.")
         return sem_abertura
-    if pedido == "whatsapp":
-        return f"Desligamento programado de energia\n{sem_abertura}"
-    if pedido == "sms":
-        return sem_abertura
+    if pedido == "anonovo":
+        return f"Feliz Ano Novo! {sem_abertura}"
     return f"{texto} Pedimos desculpas pelo transtorno e agradecemos a compreensão."
 
 
@@ -120,11 +116,9 @@ def _simulado(texto: str, pedido: str, livre: str) -> str:
     onde = f" ({onde})" if onde else ""
     if pedido == "curto":
         return f"Atenção, moradores de {quem}, em {mun}: dia {data}, das {hor}, desligamento programado de energia. {resto}".strip()
-    if pedido == "whatsapp":
-        linhas = ["Desligamento programado de energia", f"Onde: {quem}, em {mun}{onde}", f"Quando: {data}, das {hor}"]
-        return "\n".join(linhas + ([resto] if resto else []))
-    if pedido == "sms":
-        return f"Desligamento programado de energia dia {data}, das {hor}: {quem}, em {mun}. {resto}".strip()
+    if pedido == "anonovo":
+        return (f"Feliz Ano Novo! Moradores de {quem}, em {mun}{onde}: para o novo ano começar ainda melhor, no dia {data}, "
+                f"das {hor}, haverá desligamento programado de energia para manutenção na rede. {resto}").strip()
     return (f"Prezados moradores de {quem}, em {mun}{onde}: informamos que no dia {data}, das {hor}, haverá "
             f"desligamento programado de energia para manutenção na rede. Pedimos desculpas pelo transtorno e "
             f"agradecemos a compreensão. {resto}").strip()
@@ -265,7 +259,7 @@ def _fumaca() -> int:
     falhas = 0
     print("\n== Copiloto do aviso")
     for pedido in [*PEDIDOS, "livre"]:
-        livre = "faça uma versão curta e simpática para o WhatsApp" if pedido == "livre" else ""
+        livre = "faça uma versão curta e simpática" if pedido == "livre" else ""
         try:
             texto = reescrever(aviso, pedido, livre)
         except CopilotoIndisponivel as e:

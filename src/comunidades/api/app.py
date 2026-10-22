@@ -953,7 +953,7 @@ def perguntar_ao_painel(dados: PerguntaAoPainel, u: dict = Depends(exigir("ver_h
 
 class PedidoReescrita(BaseModel):
     texto: str               # o texto atual da caixa (o operador pode ter editado)
-    pedido: str              # curto, whatsapp, sms, acolhedor ou livre
+    pedido: str              # curto, acolhedor, anonovo ou livre
     livre: str = ""          # o pedido escrito pelo operador (só com pedido = livre)
 
 

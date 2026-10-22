@@ -23,7 +23,7 @@ _LINK = re.compile(r"(?:https?://|www\.)\S+", re.I)
 _PALAVRA_MAIUSCULA = re.compile(r"(?<![\w'-])[A-ZÀ-Ý][\w'-]*")
 _ABREVIATURA = re.compile(r"(?:^|\s)[A-Za-zÀ-ÿ]{1,3}\.$")   # "Sr.", "Dra.", "Av.": o nome vem logo depois
 _INICIO_DE_FRASE = set(".!?:;\n¡¿(*_\"“—–-")  # depois destes, a maiúscula é só início de frase
-PERMITIDAS = {"sms", "whatsapp"}            # palavras de canal que o aviso pode ganhar
+PERMITIDAS = {"sms", "whatsapp", "ano", "novo"}   # palavras de canal e da saudação de Ano Novo que o aviso pode ganhar
 
 
 @dataclass
